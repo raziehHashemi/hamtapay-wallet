@@ -23,7 +23,8 @@
     "test:cov": "jest --selectProjects unit integration --runInBand --coverage",
     "openapi:export": "ts-node -T scripts/export-openapi.ts",
     "demo:hostile": "ts-node -T scripts/hostile-demo.ts",
-    "probe:simulator": "ts-node -T scripts/probe-simulator.ts"
+    "probe:simulator": "ts-node -T scripts/probe-simulator.ts",
+    "demo:crash": "ts-node -T scripts/crash-recovery-demo.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.2.10",

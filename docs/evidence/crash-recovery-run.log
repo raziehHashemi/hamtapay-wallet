@@ -1,0 +1,18 @@
+> created 40 withdrawals; killing every wallet-api replica (SIGKILL)...
+> API down. Provider keeps working and its webhooks fail for ~8s...
+> restarting wallet-api replicas
+> back up; waiting for every withdrawal to reach a final state
+┌───────────────────────────────┬───────────────────────────────────────────────┐
+│ (index)                       │ Values                                        │
+├───────────────────────────────┼───────────────────────────────────────────────┤
+│ withdrawals                   │ 40                                            │
+│ status when killed            │ '{"PROCESSING":7,"SUCCEEDED":1,"PENDING":32}' │
+│ final SUCCEEDED               │ 35                                            │
+│ final FAILED                  │ 5                                             │
+│ left non-final                │ 0                                             │
+│ requestIds paid twice         │ 0                                             │
+│ our status != provider status │ 0                                             │
+│ ledger integrity              │ 'OK'                                          │
+└───────────────────────────────┴───────────────────────────────────────────────┘
+
+RECOVERED: nothing lost, nothing paid twice

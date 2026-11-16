@@ -11,3 +11,4 @@ coverage/
 # local-only build helpers (see docker-compose.override.yml)
 .local/
 docker-compose.override.yml
+!docs/evidence/*.log
