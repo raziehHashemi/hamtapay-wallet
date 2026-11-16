@@ -1,12 +1,11 @@
-import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown, Optional } from '@nestjs/common';
 import type { Channel, ConsumeMessage } from 'amqplib';
 import { AppConfig } from '../../config/app-config';
 import type { EventEnvelope } from '../outbox/outbox.service';
-import { RabbitMqConnection, WALLET_DLX, WALLET_EXCHANGE } from '../outbox/rabbitmq.connection';
+import { RabbitMqConnection } from '../outbox/rabbitmq.connection';
 import { NotificationProjector } from './notification.projector';
 
 export const NOTIFICATIONS_QUEUE = 'notifications.wallet-events';
-const DEAD_LETTER_QUEUE = `${NOTIFICATIONS_QUEUE}.dlq`;
 const RECONNECT_MS = 5000;
 
 /** RabbitMQ subscription for the notifications projector (manual ack, prefetch, dead-letter queue). */
@@ -20,7 +19,8 @@ export class WalletEventsConsumer implements OnApplicationBootstrap, OnApplicati
   constructor(
     private readonly projector: NotificationProjector,
     private readonly config: AppConfig,
-    @Optional() private readonly connection: RabbitMqConnection | null,
+    // Explicit token: a `X | null` parameter type is emitted as `Object` in decorator metadata.
+    @Optional() @Inject(RabbitMqConnection) private readonly connection: RabbitMqConnection | null,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -36,11 +36,7 @@ export class WalletEventsConsumer implements OnApplicationBootstrap, OnApplicati
   private async subscribe(): Promise<void> {
     if (this.stopped || !this.connection) return;
     try {
-      const channel = await this.connection.channel();
-      await channel.assertQueue(DEAD_LETTER_QUEUE, { durable: true });
-      await channel.bindQueue(DEAD_LETTER_QUEUE, WALLET_DLX, '#');
-      await channel.assertQueue(NOTIFICATIONS_QUEUE, { durable: true, deadLetterExchange: WALLET_DLX });
-      await channel.bindQueue(NOTIFICATIONS_QUEUE, WALLET_EXCHANGE, '#');
+      const channel = await this.connection.channel(); // also declares exchange, queue, DLQ and bindings
       await channel.prefetch(20);
       channel.on('close', () => this.scheduleResubscribe());
       channel.on('error', (error: Error) => this.logger.warn(`channel error: ${error.message}`));
