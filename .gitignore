@@ -7,3 +7,7 @@ coverage/
 .DS_Store
 .idea/
 .vscode/
+
+# local-only build helpers (see docker-compose.override.yml)
+.local/
+docker-compose.override.yml

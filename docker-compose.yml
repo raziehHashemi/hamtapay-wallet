@@ -1,0 +1,90 @@
+# One command runs everything:  docker compose up --build
+#   app (nginx :3000) -> wallet-api x2 replicas -> postgres, rabbitmq, simulator
+# Host ports can be changed in .env (see .env.example) without touching this file.
+name: hamtapay-wallet
+
+x-wallet-env: &wallet-env
+  DATABASE_URL: postgres://wallet:wallet@postgres:5432/wallet
+  RABBITMQ_URL: amqp://wallet:wallet@rabbitmq:5672
+  PSP_BASE_URL: http://simulator:8080
+  PAYOUT_BASE_URL: http://simulator:8080
+  PUBLIC_BASE_URL: http://app:3000
+  PAYOUT_WEBHOOK_SECRET: hamtapay-sim-secret
+  INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+  WITHDRAWAL_DISPATCH_DELAY_MS: ${WITHDRAWAL_DISPATCH_DELAY_MS:-0}
+  LOG_FORMAT: ${LOG_FORMAT:-text}
+
+services:
+  postgres:
+    image: postgres:16.15-alpine
+    environment:
+      POSTGRES_USER: wallet
+      POSTGRES_PASSWORD: wallet
+      POSTGRES_DB: wallet
+    ports: ['${POSTGRES_PORT:-5432}:5432']
+    volumes: ['pgdata:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U wallet -d wallet']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: wallet
+      RABBITMQ_DEFAULT_PASS: wallet
+    ports: ['${RABBITMQ_UI_PORT:-15672}:15672']
+    volumes: ['rabbitmq:/var/lib/rabbitmq']
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  simulator:
+    image: hamtapay/t103-simulator:1.0
+    ports: ['${SIMULATOR_PORT:-8080}:8080']
+    environment:
+      SIM_CHAOS: ${SIM_CHAOS:-default}
+      SIM_TIME_SCALE: ${SIM_TIME_SCALE:-1}
+      SIM_PUBLIC_URL: ${SIM_PUBLIC_URL:-http://simulator:8080}
+      PAYOUT_WEBHOOK_URL: http://app:3000/webhooks/payout
+      WEBHOOK_SECRET: hamtapay-sim-secret
+      # Enables the simulator's admin API (chaos profile switch, deterministic scenarios) used by the E2E suite.
+      SIM_ADMIN_KEY: ${SIM_ADMIN_KEY:-local-admin-key}
+
+  migrate:
+    image: hamtapay-wallet:local # built by wallet-api below (same image)
+    pull_policy: never
+    command: ['node', 'dist/database/migrate.js']
+    environment:
+      DATABASE_URL: postgres://wallet:wallet@postgres:5432/wallet
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: 'no'
+
+  wallet-api:
+    build: .
+    image: hamtapay-wallet:local
+    init: true
+    environment: *wallet-env
+    deploy:
+      replicas: ${WALLET_REPLICAS:-2}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+      simulator: { condition: service_started }
+    restart: unless-stopped
+
+  app:
+    image: nginx:1.27-alpine
+    ports: ['${APP_PORT:-3000}:3000']
+    volumes: ['./deploy/nginx.conf:/etc/nginx/nginx.conf:ro']
+    depends_on:
+      wallet-api: { condition: service_healthy }
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  rabbitmq:
