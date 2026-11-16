@@ -1,0 +1,812 @@
+openapi: "3.0.0"
+paths:
+  /wallets/{userId}:
+    get:
+      operationId: "WalletsController_getWallet"
+      parameters:
+        -
+          name: "userId"
+          required: true
+          in: "path"
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WalletResponseDto"
+      summary: "Balances of a user (zero balances for a user who never transacted)"
+      tags:
+        - "Wallets"
+  /wallets/{userId}/ledger:
+    get:
+      description: "Keyset pagination: pass `nextCursor` back as `cursor`. Stays fast for millions of entries."
+      operationId: "WalletsController_getLedger"
+      parameters:
+        -
+          name: "userId"
+          required: true
+          in: "path"
+          schema:
+            type: "string"
+        -
+          name: "limit"
+          required: false
+          in: "query"
+          schema:
+            minimum: 1
+            maximum: 200
+            default: 50
+            type: "number"
+        -
+          name: "cursor"
+          required: false
+          in: "query"
+          description: "Opaque cursor returned as `nextCursor` by the previous page"
+          schema:
+            type: "string"
+        -
+          name: "currency"
+          required: false
+          in: "query"
+          schema:
+            type: "string"
+            enum:
+              - "IRT"
+              - "USDT"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LedgerPageDto"
+      summary: "Ledger history of a user, newest first"
+      tags:
+        - "Wallets"
+  /deposits:
+    post:
+      operationId: "DepositsController_create"
+      parameters:
+        -
+          name: "Idempotency-Key"
+          in: "header"
+          required: true
+          schema:
+            type: "string"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateDepositDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/DepositResponseDto"
+      summary: "Register an IRT deposit and get the payment-gateway link"
+      tags:
+        - "Deposits"
+  /deposits/{id}:
+    get:
+      operationId: "DepositsController_get"
+      parameters:
+        -
+          name: "id"
+          required: true
+          in: "path"
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/DepositResponseDto"
+      summary: "Deposit status"
+      tags:
+        - "Deposits"
+  /webhooks/psp/callback:
+    post:
+      description: "Treated as a hint only; the result is always confirmed with PSP inquiry + verify."
+      operationId: "DepositsController_callback"
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      summary: "Payment-gateway callback (no Idempotency-Key)"
+      tags:
+        - "Deposits"
+        - "Webhooks"
+  /withdrawals:
+    post:
+      description: "Funds are held immediately; the payout happens asynchronously. Errors: 400 INVALID_DESTINATION, 422 BELOW_MINIMUM / INSUFFICIENT_FUNDS / DAILY_LIMIT_EXCEEDED / IDEMPOTENCY_KEY_REUSED."
+      operationId: "WithdrawalsController_create"
+      parameters:
+        -
+          name: "Idempotency-Key"
+          in: "header"
+          required: true
+          schema:
+            type: "string"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateWithdrawalDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WithdrawalResponseDto"
+      summary: "Request a withdrawal (IRT → IBAN, USDT → TRC20)"
+      tags:
+        - "Withdrawals"
+  /withdrawals/{id}:
+    get:
+      operationId: "WithdrawalsController_get"
+      parameters:
+        -
+          name: "id"
+          required: true
+          in: "path"
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WithdrawalResponseDto"
+      summary: "Withdrawal status"
+      tags:
+        - "Withdrawals"
+  /withdrawals/{id}/cancel:
+    post:
+      description: "409 WITHDRAWAL_NOT_CANCELLABLE once it is PROCESSING or final. See docs/ambiguities.md #3."
+      operationId: "WithdrawalsController_cancel"
+      parameters:
+        -
+          name: "id"
+          required: true
+          in: "path"
+          schema:
+            type: "string"
+        -
+          name: "Idempotency-Key"
+          in: "header"
+          required: true
+          schema:
+            type: "string"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CancelWithdrawalDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WithdrawalResponseDto"
+      summary: "Cancel a withdrawal that has not been sent to the payout provider yet (status PENDING)"
+      tags:
+        - "Withdrawals"
+  /webhooks/payout:
+    post:
+      operationId: "WithdrawalsController_payoutWebhook"
+      parameters:
+        -
+          name: "X-Signature"
+          in: "header"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: ""
+      summary: "Payout provider webhook (HMAC-SHA256 in X-Signature, no Idempotency-Key)"
+      tags:
+        - "Withdrawals"
+        - "Webhooks"
+  /internal/withdrawals/review:
+    get:
+      operationId: "WithdrawalsController_reviewQueue"
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      security:
+        -
+          internal-api-key: []
+      summary: "Withdrawals flagged for a human (no final answer for too long, late success, ...)"
+      tags:
+        - "Withdrawals"
+        - "Operations (internal)"
+  /transfers:
+    post:
+      operationId: "TransfersController_create"
+      parameters:
+        -
+          name: "Idempotency-Key"
+          in: "header"
+          required: true
+          schema:
+            type: "string"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateTransferDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TransferResponseDto"
+      summary: "Atomic transfer between two users (IRT or USDT)"
+      tags:
+        - "Transfers"
+  /internal/adjustments:
+    post:
+      operationId: "OperationsController_createAdjustment"
+      parameters:
+        -
+          name: "Idempotency-Key"
+          in: "header"
+          required: true
+          schema:
+            type: "string"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateAdjustmentDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AdjustmentResponseDto"
+      security:
+        -
+          internal-api-key: []
+      summary: "Manually increase a user balance (with a mandatory reason); double-entry"
+      tags:
+        - "Operations (internal)"
+  /internal/adjustments/{id}/reverse:
+    post:
+      operationId: "OperationsController_reverseAdjustment"
+      parameters:
+        -
+          name: "id"
+          required: true
+          in: "path"
+          schema:
+            type: "string"
+        -
+          name: "Idempotency-Key"
+          in: "header"
+          required: true
+          schema:
+            type: "string"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ReverseAdjustmentDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AdjustmentResponseDto"
+      security:
+        -
+          internal-api-key: []
+      summary: "Correct a mistaken adjustment with a reversal journal (never edits the ledger)"
+      tags:
+        - "Operations (internal)"
+  /internal/ledger/integrity:
+    get:
+      description: "Balanced journals, stored balance == Σ entries for every user account, no negative balance."
+      operationId: "OperationsController_checkIntegrity"
+      parameters: []
+      responses:
+        "200":
+          description: "Integrity report"
+      security:
+        -
+          internal-api-key: []
+      summary: "Re-derive ledger invariants from raw entries"
+      tags:
+        - "Operations (internal)"
+  /reconciliation/run:
+    post:
+      description: "No Idempotency-Key: the run has no side effect on balances (each run is stored as a report)."
+      operationId: "ReconciliationController_run"
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RunReconciliationDto"
+      responses:
+        "200":
+          description: "{ date, summary, mismatches: [{ type, reference, ... }], warnings }"
+      security:
+        -
+          internal-api-key: []
+      summary: "Compare the PSP settlement report of a day with our transactions (report only, fixes nothing)"
+      tags:
+        - "Reconciliation"
+  /health/live:
+    get:
+      operationId: "HealthController_live"
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      summary: "Liveness: the process is up"
+      tags:
+        - "Health"
+  /health:
+    get:
+      description: "Ready iff PostgreSQL answers. A broker outage only degrades (events wait in the outbox)."
+      operationId: "HealthController_ready"
+      parameters: []
+      responses:
+        "200":
+          description: "{ status, database, broker, outboxBacklog }"
+      summary: "Readiness"
+      tags:
+        - "Health"
+info:
+  title: "HamtaPay Wallet & Ledger Service"
+  description: "Wallet and double-entry ledger for IRT (Toman) and USDT. All amounts are strings: IRT integer Toman, USDT up to 6 decimals. Every money-moving POST (except webhooks and /reconciliation/run) requires an `Idempotency-Key` header. Errors are `{ \"code\": \"...\", \"message\": \"...\" }`."
+  version: "1.0.0"
+  contact: {}
+tags: []
+servers: []
+components:
+  securitySchemes:
+    internal-api-key:
+      type: "apiKey"
+      in: "header"
+      name: "X-Internal-Api-Key"
+  schemas:
+    BalanceDto:
+      type: "object"
+      properties:
+        currency:
+          type: "string"
+          enum:
+            - "IRT"
+            - "USDT"
+          example: "IRT"
+        available:
+          type: "string"
+          example: "1500000"
+          description: "Amount the user can withdraw or transfer right now"
+        held:
+          type: "string"
+          example: "200000"
+          description: "Reserved by withdrawals that are not final yet"
+        total:
+          type: "string"
+          example: "1700000"
+          description: "available + held"
+        debt:
+          type: "string"
+          example: "0"
+          description: "Amount owed to the exchange after a reconciled double payout (normally 0)"
+      required:
+        - "currency"
+        - "available"
+        - "held"
+        - "total"
+        - "debt"
+    WalletResponseDto:
+      type: "object"
+      properties:
+        userId:
+          type: "string"
+          example: "user-42"
+        balances:
+          type: "array"
+          items:
+            "$ref": "#/components/schemas/BalanceDto"
+      required:
+        - "userId"
+        - "balances"
+    LedgerItemDto:
+      type: "object"
+      properties:
+        id:
+          type: "string"
+          example: "1042"
+        journalId:
+          type: "string"
+          example: "517"
+        type:
+          type: "string"
+          example: "WITHDRAWAL_HOLD"
+        currency:
+          type: "string"
+          enum:
+            - "IRT"
+            - "USDT"
+        account:
+          type: "string"
+          enum:
+            - "AVAILABLE"
+            - "HELD"
+            - "RECEIVABLE"
+        direction:
+          type: "string"
+          enum:
+            - "DEBIT"
+            - "CREDIT"
+          description: "CREDIT increases a user balance, DEBIT decreases it"
+        amount:
+          type: "string"
+          example: "250000"
+        balanceAfter:
+          type: "object"
+          example: "1250000"
+          nullable: true
+        referenceType:
+          type: "string"
+          example: "withdrawal"
+        referenceId:
+          type: "string"
+          example: "0196a3c2-7a4e-7c1d-9f00-3f1a2b3c4d5e"
+        description:
+          type: "object"
+          nullable: true
+        createdAt:
+          type: "string"
+      required:
+        - "id"
+        - "journalId"
+        - "type"
+        - "currency"
+        - "account"
+        - "direction"
+        - "amount"
+        - "balanceAfter"
+        - "referenceType"
+        - "referenceId"
+        - "description"
+        - "createdAt"
+    LedgerPageDto:
+      type: "object"
+      properties:
+        items:
+          type: "array"
+          items:
+            "$ref": "#/components/schemas/LedgerItemDto"
+        nextCursor:
+          type: "string"
+          nullable: true
+      required:
+        - "items"
+        - "nextCursor"
+    CreateDepositDto:
+      type: "object"
+      properties:
+        userId:
+          type: "string"
+          example: "user-42"
+          description: "Opaque user id; the wallet is created on first use"
+          pattern: "^[A-Za-z0-9._:@-]{1,64}$"
+        amount:
+          type: "string"
+          example: "500000"
+          description: "Decimal string. IRT: integer Toman. USDT: up to 6 decimals. JSON numbers are rejected."
+      required:
+        - "userId"
+        - "amount"
+    DepositResponseDto:
+      type: "object"
+      properties:
+        depositId:
+          type: "string"
+          example: "0196a3c2-7a4e-7c1d-9f00-3f1a2b3c4d5e"
+        status:
+          type: "string"
+          enum:
+            - "PENDING"
+            - "VERIFYING"
+            - "SUCCEEDED"
+            - "FAILED"
+          description: "Final states: SUCCEEDED, FAILED"
+        paymentUrl:
+          type: "string"
+          nullable: true
+          example: "http://simulator:8080/psp/pay/A0d1c8..."
+        userId:
+          type: "string"
+        amount:
+          type: "string"
+          example: "500000"
+          description: "Requested amount (IRT, Toman)"
+        creditedAmount:
+          type: "string"
+          nullable: true
+          description: "Amount actually credited (IRT)"
+        refId:
+          type: "string"
+          nullable: true
+          description: "Bank/PSP tracking number (refId)"
+        failureReason:
+          type: "string"
+          nullable: true
+        createdAt:
+          type: "string"
+        updatedAt:
+          type: "string"
+      required:
+        - "depositId"
+        - "status"
+        - "paymentUrl"
+        - "userId"
+        - "amount"
+        - "creditedAmount"
+        - "refId"
+        - "failureReason"
+        - "createdAt"
+        - "updatedAt"
+    CreateWithdrawalDto:
+      type: "object"
+      properties:
+        userId:
+          type: "string"
+          example: "user-42"
+          description: "Opaque user id; the wallet is created on first use"
+          pattern: "^[A-Za-z0-9._:@-]{1,64}$"
+        currency:
+          type: "string"
+          enum:
+            - "IRT"
+            - "USDT"
+          example: "IRT"
+        amount:
+          type: "string"
+          example: "250000"
+          description: "Decimal string. IRT: integer Toman. USDT: up to 6 decimals. JSON numbers are rejected."
+        destination:
+          type: "string"
+          example: "IR820540102680020817909002"
+          description: "IRT: Iranian IBAN (Sheba). USDT: TRC20 address."
+      required:
+        - "userId"
+        - "currency"
+        - "amount"
+        - "destination"
+    WithdrawalResponseDto:
+      type: "object"
+      properties:
+        withdrawalId:
+          type: "string"
+        status:
+          type: "string"
+          enum:
+            - "PENDING"
+            - "PROCESSING"
+            - "SUCCEEDED"
+            - "FAILED"
+          description: "Final states: SUCCEEDED, FAILED"
+        userId:
+          type: "string"
+        currency:
+          type: "string"
+          enum:
+            - "IRT"
+            - "USDT"
+        amount:
+          type: "string"
+          example: "250000"
+        fee:
+          type: "string"
+          example: "0"
+          description: "Fee deducted on top of the amount (USDT: 1)"
+        destination:
+          type: "string"
+        failureReason:
+          type: "string"
+          nullable: true
+          example: null
+        trackingId:
+          type: "string"
+          nullable: true
+          description: "Payout provider tracking id"
+        createdAt:
+          type: "string"
+        updatedAt:
+          type: "string"
+      required:
+        - "withdrawalId"
+        - "status"
+        - "userId"
+        - "currency"
+        - "amount"
+        - "fee"
+        - "destination"
+        - "failureReason"
+        - "trackingId"
+        - "createdAt"
+        - "updatedAt"
+    CancelWithdrawalDto:
+      type: "object"
+      properties:
+        userId:
+          type: "string"
+          description: "If given, must match the withdrawal owner"
+    CreateTransferDto:
+      type: "object"
+      properties:
+        fromUserId:
+          type: "string"
+          example: "user-42"
+          description: "Sender"
+          pattern: "^[A-Za-z0-9._:@-]{1,64}$"
+        toUserId:
+          type: "string"
+          example: "user-42"
+          description: "Receiver (wallet is created on first use)"
+          pattern: "^[A-Za-z0-9._:@-]{1,64}$"
+        currency:
+          type: "string"
+          enum:
+            - "IRT"
+            - "USDT"
+          example: "IRT"
+        amount:
+          type: "string"
+          example: "150000"
+          description: "Decimal string. IRT: integer Toman. USDT: up to 6 decimals. JSON numbers are rejected."
+      required:
+        - "fromUserId"
+        - "toUserId"
+        - "currency"
+        - "amount"
+    TransferResponseDto:
+      type: "object"
+      properties:
+        transferId:
+          type: "string"
+        status:
+          type: "string"
+          example: "SUCCEEDED"
+          description: "Transfers are atomic: they either fully happen or not at all"
+        fromUserId:
+          type: "string"
+        toUserId:
+          type: "string"
+        currency:
+          type: "string"
+          enum:
+            - "IRT"
+            - "USDT"
+        amount:
+          type: "string"
+          example: "150000"
+        journalId:
+          type: "string"
+        createdAt:
+          type: "string"
+      required:
+        - "transferId"
+        - "status"
+        - "fromUserId"
+        - "toUserId"
+        - "currency"
+        - "amount"
+        - "journalId"
+        - "createdAt"
+    CreateAdjustmentDto:
+      type: "object"
+      properties:
+        userId:
+          type: "string"
+          example: "user-42"
+          description: "Opaque user id; the wallet is created on first use"
+          pattern: "^[A-Za-z0-9._:@-]{1,64}$"
+        currency:
+          type: "string"
+          enum:
+            - "IRT"
+            - "USDT"
+          example: "IRT"
+        amount:
+          type: "string"
+          example: "500000"
+          description: "Decimal string. IRT: integer Toman. USDT: up to 6 decimals. JSON numbers are rejected."
+        reason:
+          type: "string"
+          example: "Compensation for incident INC-2041 (duplicate fee)"
+          maxLength: 500
+        operator:
+          type: "string"
+          example: "ops.sara"
+          description: "Who performed the adjustment (audit trail)"
+      required:
+        - "userId"
+        - "currency"
+        - "amount"
+        - "reason"
+    AdjustmentResponseDto:
+      type: "object"
+      properties:
+        adjustmentId:
+          type: "string"
+        journalId:
+          type: "string"
+        userId:
+          type: "string"
+        currency:
+          type: "string"
+          enum:
+            - "IRT"
+            - "USDT"
+        amount:
+          type: "string"
+          example: "500000"
+        reason:
+          type: "string"
+        operator:
+          type: "string"
+          nullable: true
+        reversalJournalId:
+          type: "string"
+          nullable: true
+        createdAt:
+          type: "string"
+      required:
+        - "adjustmentId"
+        - "journalId"
+        - "userId"
+        - "currency"
+        - "amount"
+        - "reason"
+        - "operator"
+        - "reversalJournalId"
+        - "createdAt"
+    ReverseAdjustmentDto:
+      type: "object"
+      properties:
+        reason:
+          type: "string"
+          example: "Credited to the wrong user"
+          maxLength: 500
+      required:
+        - "reason"
+    RunReconciliationDto:
+      type: "object"
+      properties:
+        date:
+          type: "string"
+          example: "2026-11-16"
+          description: "Settlement day (Asia/Tehran calendar day)"
+      required:
+        - "date"
