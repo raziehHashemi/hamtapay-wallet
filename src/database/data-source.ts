@@ -3,6 +3,8 @@ import { CreateLedger1794787200000 } from './migrations/1794787200000-CreateLedg
 import { CreateIdempotencyAndOutbox1794787260000 } from './migrations/1794787260000-CreateIdempotencyAndOutbox';
 import { CreateDepositsAndWithdrawals1794787320000 } from './migrations/1794787320000-CreateDepositsAndWithdrawals';
 import { CreateTransfersAndAdjustments1794787380000 } from './migrations/1794787380000-CreateTransfersAndAdjustments';
+import { AddWithdrawalReturnTracking1794830400000 } from './migrations/1794830400000-AddWithdrawalReturnTracking';
+import { CreateReconciliationReports1794830460000 } from './migrations/1794830460000-CreateReconciliationReports';
 
 /** Ordered list of versioned migrations. New schema changes are appended, never edited in place. */
 export const MIGRATIONS = [
@@ -10,6 +12,8 @@ export const MIGRATIONS = [
   CreateIdempotencyAndOutbox1794787260000,
   CreateDepositsAndWithdrawals1794787320000,
   CreateTransfersAndAdjustments1794787380000,
+  AddWithdrawalReturnTracking1794830400000,
+  CreateReconciliationReports1794830460000,
 ];
 
 export function buildDataSourceOptions(databaseUrl: string, poolSize = 10): DataSourceOptions {
