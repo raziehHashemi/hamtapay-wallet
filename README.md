@@ -60,8 +60,8 @@ then run the folders in order. It also runs headless with newman:
 
 ```bash
 npm ci
-npm test                    # unit: 164 tests, pure logic, no I/O (≈ 5 s)
-npm run test:integration    # 102 tests against a REAL PostgreSQL (Testcontainers; only Docker needed) (≈ 30 s)
+npm test                    # unit: 165 tests, pure logic, no I/O (≈ 5 s)
+npm run test:integration    # 104 tests against a REAL PostgreSQL (Testcontainers; only Docker needed) (≈ 30 s)
 npm run test:e2e            # 24 black-box tests against the running stack + real simulator (needs `docker compose up`)
 ```
 
@@ -86,6 +86,8 @@ npm run demo:crash          # SIGKILLs every API replica mid-flight, restarts, s
 
 All bodies are JSON. **All amounts are strings** (IRT = integer Toman, USDT ≤ 6 decimals); JSON numbers are
 rejected. Every money-moving POST requires `Idempotency-Key`. Errors are `{ "code", "message" }`.
+Keys are unique per operation (not per user), so reusing a key with *any* different body, another `userId`
+included, is `422 IDEMPOTENCY_KEY_REUSED`, exactly as the contract defines it. Clients should send UUIDs.
 
 | Method | Path | Notes |
 |---|---|---|

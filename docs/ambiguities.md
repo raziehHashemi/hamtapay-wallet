@@ -39,8 +39,9 @@ treated as the truth, and the ledger must say what really happened. In
 2. **Mark it.** The withdrawal becomes `SUCCEEDED` with `anomaly = LATE_SUCCESS_AFTER_FAILURE …` and
    `needs_review = true`. Its amount counts against the daily cap of its original day again (forced, because
    reality has already happened).
-3. **Contain it.** While `debt > 0`, new withdrawals and outgoing transfers are rejected with
-   `422 ACCOUNT_RESTRICTED`. Deposits are still accepted.
+3. **Contain it.** While the user owes anything, in **any** currency, new withdrawals and outgoing transfers in
+   every currency are rejected with `422 ACCOUNT_RESTRICTED` (so the debt can't be dodged by moving USDT out).
+   Deposits are still accepted.
 4. **Tell the humans.** A `withdrawal.late_success` event goes through the outbox (risk, support,
    notification) with the recovered and outstanding amounts, and an error log is written.
 5. **Ops playbook (outside the code):** try to recall the *second* transfer if the bank cycle allows it (Paya can
