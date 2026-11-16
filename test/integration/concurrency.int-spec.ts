@@ -164,6 +164,40 @@ describe('concurrency across two service instances (real PostgreSQL)', () => {
     expect(sharedPayout.submits.filter((s) => ids.includes(s.requestId))).toHaveLength(30);
   });
 
+  it('a RETURNED webhook (settle + refund in one transaction) racing new withdrawals of the same user never deadlocks', async () => {
+    // RETURN without a prior SUCCEEDED posts two journals (HELD, then AVAILABLE). With accounts locked up front
+    // in id order this cannot invert the lock order of concurrent withdrawals (which lock AVAILABLE, then HELD).
+    for (let round = 0; round < 5; round++) {
+      const userId = uniqueUser('ret');
+      await fund(a, userId, '20000000');
+      const first = await a.http
+        .post('/withdrawals')
+        .set('Idempotency-Key', key())
+        .send({ userId, currency: 'IRT', amount: '1000000', destination: VALID_IBAN })
+        .expect(201);
+      const id = first.body.withdrawalId;
+      await a.dataSource.query(
+        `UPDATE withdrawals SET status = 'PROCESSING', submitted_at = now(), provider_acknowledged_at = now(),
+                next_attempt_at = NULL WHERE id = $1`,
+        [id],
+      );
+      const [webhook, ...withdrawals] = await Promise.all([
+        payoutWebhook(instance(round), { requestId: id, status: 'RETURNED', reason: 'ACCOUNT_CLOSED' }),
+        ...Array.from({ length: 12 }, (_, i) =>
+          instance(i)
+            .http.post('/withdrawals')
+            .set('Idempotency-Key', key())
+            .send({ userId, currency: 'IRT', amount: '500000', destination: VALID_IBAN }),
+        ),
+      ]);
+      expect(webhook.status).toBe(200);
+      expect(withdrawals.map((r) => r.status).filter((s) => s !== 201)).toEqual([]);
+      const w = await wallet(a, userId);
+      expect(w).toMatchObject({ held: '6000000', available: '14000000' }); // 20M - 12 x 0.5M held; 1M refunded
+    }
+    await expectLedgerIntact(a);
+  });
+
   it('a burst of duplicate webhooks on both instances plus pollers settles a withdrawal exactly once', async () => {
     const userId = uniqueUser('wh');
     await fund(a, userId, '1000000');

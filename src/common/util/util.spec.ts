@@ -20,6 +20,11 @@ describe('canonicalJson', () => {
 describe('cursor', () => {
   it('round-trips', () => {
     expect(decodeCursor(encodeCursor('12345'))).toBe('12345');
+    expect(decodeCursor(encodeCursor('9223372036854775807'))).toBe('9223372036854775807');
+  });
+  it('rejects ids beyond PostgreSQL BIGINT (would otherwise be a 500)', () => {
+    expect(decodeCursor(encodeCursor('9223372036854775808'))).toBeNull();
+    expect(decodeCursor(encodeCursor('9999999999999999999'))).toBeNull();
   });
   it.each([
     '',

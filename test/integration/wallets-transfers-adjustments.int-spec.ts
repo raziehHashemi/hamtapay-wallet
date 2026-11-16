@@ -81,6 +81,7 @@ describe('wallets, ledger history, transfers and adjustments (real PostgreSQL)',
       [{ limit: 201 }, 'limit'],
       [{ limit: 'abc' }, 'limit'],
       [{ cursor: 'not-a-cursor' }, 'cursor'],
+      [{ cursor: Buffer.from('le:9999999999999999999').toString('base64url') }, 'cursor'], // > BIGINT
       [{ currency: 'EUR' }, 'currency'],
     ])('rejects %o', async (query, field) => {
       const res = await t.http.get(`/wallets/${uniqueUser()}/ledger`).query(query).expect(400);

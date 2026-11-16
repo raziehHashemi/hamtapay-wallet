@@ -53,8 +53,7 @@ export class WithdrawalsService {
     const result = await this.idempotency.execute(
       { scope: 'withdrawals.create', key, request },
       async (manager) => {
-        const balance = await this.ledger.getUserBalance(manager, userId, currency);
-        if (balance.receivable > 0n) {
+        if (await this.ledger.hasOutstandingDebt(manager, userId)) {
           throw Errors.accountRestricted('withdrawals are suspended until the outstanding debt is settled');
         }
         const id = uuidv7();

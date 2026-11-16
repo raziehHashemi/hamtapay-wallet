@@ -395,6 +395,20 @@ describe('withdrawals (real PostgreSQL, fake payout provider with the simulator 
 
       await fund(t, userId, '5000000');
       expect((await withdraw(t, userId, '100000').expect(422)).body.code).toBe('ACCOUNT_RESTRICTED');
+      // the IRT debt also blocks moving OTHER currencies out (no dodging via USDT)
+      await fund(t, userId, '500', 'USDT');
+      const usdtWithdrawal = await t.http
+        .post('/withdrawals')
+        .set('Idempotency-Key', key())
+        .send({ userId, currency: 'USDT', amount: '100', destination: VALID_TRC20 })
+        .expect(422);
+      expect(usdtWithdrawal.body.code).toBe('ACCOUNT_RESTRICTED');
+      const usdtTransfer = await t.http
+        .post('/transfers')
+        .set('Idempotency-Key', key())
+        .send({ fromUserId: userId, toUserId: uniqueUser(), currency: 'USDT', amount: '100' })
+        .expect(422);
+      expect(usdtTransfer.body.code).toBe('ACCOUNT_RESTRICTED');
       const [{ n }] = await t.dataSource.query(
         `SELECT count(*)::int AS n FROM outbox_events WHERE event_type = 'withdrawal.late_success' AND aggregate_id = $1`,
         [first],

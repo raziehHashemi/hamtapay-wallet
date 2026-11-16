@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Writes docs/openapi.json and docs/openapi.yaml from the code (no database needed: Nest "preview" mode
  * builds the module graph without instantiating providers).   npm run openapi:export

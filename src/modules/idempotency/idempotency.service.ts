@@ -3,7 +3,9 @@ import { DataSource, EntityManager } from 'typeorm';
 import { DomainError, Errors } from '../../common/errors/domain-error';
 import { ErrorCode } from '../../common/errors/error-codes';
 import { canonicalJson, sha256Hex } from '../../common/util/canonical-json';
-import { queryOne, queryRows } from '../../database/sql';
+import { pgErrorCode, queryOne, queryRows } from '../../database/sql';
+
+const MAX_ATTEMPTS = 3;
 
 export interface IdempotentRequest {
   /** Operation name, e.g. `withdrawals.create`. Keys are unique per scope. */
@@ -49,6 +51,26 @@ export class IdempotencyService {
     request: IdempotentRequest,
     work: (manager: EntityManager) => Promise<T>,
     options: { successStatus?: number } = {},
+  ): Promise<IdempotentResult<T>> {
+    // Defence in depth: if PostgreSQL aborts the transaction as a deadlock victim or on a serialization
+    // failure, nothing of it survived (key row included), so running it again is safe.
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.executeOnce(request, work, options);
+      } catch (error) {
+        const code = pgErrorCode(error);
+        if ((code !== '40P01' && code !== '40001') || attempt >= MAX_ATTEMPTS) throw error;
+        this.logger.warn(
+          `${request.scope}: transaction aborted (${code}), retrying (${attempt}/${MAX_ATTEMPTS})`,
+        );
+      }
+    }
+  }
+
+  private async executeOnce<T>(
+    request: IdempotentRequest,
+    work: (manager: EntityManager) => Promise<T>,
+    options: { successStatus?: number },
   ): Promise<IdempotentResult<T>> {
     const hash = sha256Hex(canonicalJson({ scope: request.scope, request: request.request }));
     const runner = this.dataSource.createQueryRunner();

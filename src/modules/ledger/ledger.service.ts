@@ -172,6 +172,22 @@ export class LedgerService {
     return this.snapshot(userId, currency, rows);
   }
 
+  /**
+   * True when the user owes the exchange money in ANY currency (ambiguity #1: a payout confirmed after we had
+   * released it). Used to suspend withdrawals and outgoing transfers in every currency, so the debt cannot be
+   * dodged by moving another currency out. A plain read on purpose: a share lock here would take RECEIVABLE
+   * before AVAILABLE, the opposite of the late-success path, and could deadlock with it.
+   */
+  async hasOutstandingDebt(manager: EntityManager, userId: string): Promise<boolean> {
+    const row = await queryOne<{ owes: boolean }>(
+      manager,
+      `SELECT EXISTS (SELECT 1 FROM ledger_accounts
+                       WHERE owner_user_id = $1 AND kind = 'USER_RECEIVABLE' AND balance > 0) AS owes`,
+      [userId],
+    );
+    return row?.owes ?? false;
+  }
+
   /** Same as getUserBalance but row-locks the user's accounts until the transaction ends. */
   async lockUserBalance(
     manager: EntityManager,

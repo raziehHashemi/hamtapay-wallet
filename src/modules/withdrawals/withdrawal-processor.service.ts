@@ -36,6 +36,12 @@ export type ObservationSource = 'submit' | 'poll' | 'webhook';
 type Patch = Partial<WithdrawalEntity>;
 
 const POLL_BASE_MS = 2000;
+const MONEY_TRANSITIONS: ReadonlySet<Transition['kind']> = new Set([
+  'SUCCEED',
+  'FAIL',
+  'RETURN',
+  'LATE_SUCCESS',
+]);
 const RETURN_WATCH_BASE_MS = 30000;
 const RETURN_WATCH_CAP_MS = 600000;
 
@@ -68,7 +74,11 @@ export class WithdrawalProcessor {
       return;
     }
     if (w.status !== WithdrawalStatus.PROCESSING) {
-      await this.dataSource.getRepository(WithdrawalEntity).update({ id }, { nextAttemptAt: null });
+      // Read without a lock: only clear the schedule if nobody changed the status since (e.g. a late success
+      // that just scheduled the return watch).
+      await this.dataSource
+        .getRepository(WithdrawalEntity)
+        .update({ id, status: w.status }, { nextAttemptAt: null });
       return;
     }
 
@@ -114,6 +124,13 @@ export class WithdrawalProcessor {
       if (observation.trackingId && !w.providerTrackingId) patch.providerTrackingId = observation.trackingId;
       if (isNewerProviderStatus(w.providerStatus, observation.status))
         patch.providerStatus = observation.status;
+
+      // A money transition may post several journals (RETURN without a prior SUCCEEDED settles HELD, then
+      // credits AVAILABLE). Lock all of the user's accounts for this currency up front, in id order — the same
+      // order every other path uses — so two transactions can never wait on each other's rows.
+      if (MONEY_TRANSITIONS.has(transition.kind)) {
+        await this.ledger.lockUserBalance(manager, w.userId, w.currency);
+      }
 
       switch (transition.kind) {
         case 'NOOP':
