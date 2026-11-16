@@ -1,0 +1,14 @@
+# Simulator alone, with callbacks/webhooks pointed at the host-side probe script (npm run probe:simulator).
+services:
+  simulator:
+    image: hamtapay/t103-simulator:1.0
+    ports: ['8080:8080']
+    environment:
+      SIM_CHAOS: default
+      SIM_TIME_SCALE: '20'
+      SIM_PUBLIC_URL: http://localhost:8080
+      PAYOUT_WEBHOOK_URL: http://host.docker.internal:39999/webhook
+      WEBHOOK_SECRET: hamtapay-sim-secret
+      SIM_ADMIN_KEY: probe-admin-key
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
