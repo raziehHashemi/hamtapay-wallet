@@ -11,7 +11,9 @@ export class ApiExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
     const { status, body } = this.toHttp(exception);
-    if (status >= 500) {
+    if (exception instanceof DomainError && status >= 500) {
+      this.logger.warn(`${body.code}: ${body.message}`); // expected, e.g. gateway down
+    } else if (status >= 500) {
       this.logger.error(exception instanceof Error ? exception.stack : String(exception));
     }
     response.status(status).json(body);
