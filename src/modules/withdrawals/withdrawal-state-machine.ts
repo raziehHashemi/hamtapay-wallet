@@ -56,14 +56,22 @@ export function decideTransition(
         case 'FAILED':
           return { kind: 'FAIL', reason: `${FAILURE_PREFIX.FAILED}:${providerReason}` };
         case 'RETURNED':
-          return { kind: 'RETURN', reason: `${FAILURE_PREFIX.RETURNED}:${providerReason}`, settleFirst: true };
+          return {
+            kind: 'RETURN',
+            reason: `${FAILURE_PREFIX.RETURNED}:${providerReason}`,
+            settleFirst: true,
+          };
       }
       break;
 
     case WithdrawalStatus.SUCCEEDED:
       switch (observed) {
         case 'RETURNED':
-          return { kind: 'RETURN', reason: `${FAILURE_PREFIX.RETURNED}:${providerReason}`, settleFirst: false };
+          return {
+            kind: 'RETURN',
+            reason: `${FAILURE_PREFIX.RETURNED}:${providerReason}`,
+            settleFirst: false,
+          };
         case 'FAILED':
           return { kind: 'ANOMALY', note: 'provider reported FAILED (signed) after SUCCEEDED' };
         default:

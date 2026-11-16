@@ -69,10 +69,14 @@ export class OutboxRelayWorker extends PollingWorker {
           `UPDATE outbox_events SET attempts = attempts + 1, last_error = $2 WHERE id = ANY($1::bigint[])`,
           [ids, String((error as Error).message).slice(0, 500)],
         );
-        this.logger.warn(`publish failed, ${rows.length} events stay in the outbox: ${(error as Error).message}`);
+        this.logger.warn(
+          `publish failed, ${rows.length} events stay in the outbox: ${(error as Error).message}`,
+        );
         return false;
       }
-      await queryRows(manager, `UPDATE outbox_events SET published_at = now() WHERE id = ANY($1::bigint[])`, [ids]);
+      await queryRows(manager, `UPDATE outbox_events SET published_at = now() WHERE id = ANY($1::bigint[])`, [
+        ids,
+      ]);
       return rows.length === BATCH;
     });
   }

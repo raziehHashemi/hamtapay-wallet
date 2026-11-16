@@ -11,7 +11,9 @@ export class AddWithdrawalReturnTracking1794830400000 implements MigrationInterf
 
   async up(q: QueryRunner): Promise<void> {
     await q.query(`ALTER TABLE withdrawals ADD COLUMN provider_returned_at TIMESTAMPTZ`);
-    await q.query(`ALTER TABLE withdrawals ADD COLUMN return_journal_id BIGINT REFERENCES ledger_journals (id)`);
+    await q.query(
+      `ALTER TABLE withdrawals ADD COLUMN return_journal_id BIGINT REFERENCES ledger_journals (id)`,
+    );
   }
 
   async down(q: QueryRunner): Promise<void> {

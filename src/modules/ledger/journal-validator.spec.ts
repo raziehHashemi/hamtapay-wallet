@@ -16,7 +16,11 @@ describe('assertValidJournal', () => {
       assertValidJournal(
         draft([
           { account: systemAccount(Currency.IRT, AccountKind.PSP_CLEARING), direction: 'DEBIT', amount: 10n },
-          { account: userAccount('u', Currency.IRT, AccountKind.USER_AVAILABLE), direction: 'CREDIT', amount: 10n },
+          {
+            account: userAccount('u', Currency.IRT, AccountKind.USER_AVAILABLE),
+            direction: 'CREDIT',
+            amount: 10n,
+          },
         ]),
       ),
     ).not.toThrow();
@@ -26,8 +30,16 @@ describe('assertValidJournal', () => {
     expect(() =>
       assertValidJournal(
         draft([
-          { account: userAccount('u', Currency.USDT, AccountKind.USER_HELD), direction: 'DEBIT', amount: 11n },
-          { account: systemAccount(Currency.USDT, AccountKind.PAYOUT_CLEARING), direction: 'CREDIT', amount: 10n },
+          {
+            account: userAccount('u', Currency.USDT, AccountKind.USER_HELD),
+            direction: 'DEBIT',
+            amount: 11n,
+          },
+          {
+            account: systemAccount(Currency.USDT, AccountKind.PAYOUT_CLEARING),
+            direction: 'CREDIT',
+            amount: 10n,
+          },
           { account: systemAccount(Currency.USDT, AccountKind.FEE_REVENUE), direction: 'CREDIT', amount: 1n },
         ]),
       ),
@@ -39,7 +51,11 @@ describe('assertValidJournal', () => {
       assertValidJournal(
         draft([
           { account: systemAccount(Currency.IRT, AccountKind.PSP_CLEARING), direction: 'DEBIT', amount: 10n },
-          { account: userAccount('u', Currency.IRT, AccountKind.USER_AVAILABLE), direction: 'CREDIT', amount: 9n },
+          {
+            account: userAccount('u', Currency.IRT, AccountKind.USER_AVAILABLE),
+            direction: 'CREDIT',
+            amount: 9n,
+          },
         ]),
       ),
     ).toThrow('unbalanced');
@@ -50,7 +66,11 @@ describe('assertValidJournal', () => {
       assertValidJournal(
         draft([
           { account: systemAccount(Currency.IRT, AccountKind.PSP_CLEARING), direction: 'DEBIT', amount: 10n },
-          { account: userAccount('u', Currency.USDT, AccountKind.USER_AVAILABLE), direction: 'CREDIT', amount: 10n },
+          {
+            account: userAccount('u', Currency.USDT, AccountKind.USER_AVAILABLE),
+            direction: 'CREDIT',
+            amount: 10n,
+          },
         ]),
       ),
     ).toThrow('unbalanced');
@@ -61,7 +81,11 @@ describe('assertValidJournal', () => {
       assertValidJournal(
         draft([
           { account: systemAccount(Currency.IRT, AccountKind.PSP_CLEARING), direction: 'DEBIT', amount },
-          { account: userAccount('u', Currency.IRT, AccountKind.USER_AVAILABLE), direction: 'CREDIT', amount },
+          {
+            account: userAccount('u', Currency.IRT, AccountKind.USER_AVAILABLE),
+            direction: 'CREDIT',
+            amount,
+          },
         ]),
       ),
     ).toThrow('positive');
@@ -71,7 +95,11 @@ describe('assertValidJournal', () => {
     expect(() =>
       assertValidJournal(
         draft([
-          { account: { kind: AccountKind.USER_AVAILABLE, currency: Currency.IRT }, direction: 'DEBIT', amount: 1n },
+          {
+            account: { kind: AccountKind.USER_AVAILABLE, currency: Currency.IRT },
+            direction: 'DEBIT',
+            amount: 1n,
+          },
           { account: systemAccount(Currency.IRT, AccountKind.PSP_CLEARING), direction: 'CREDIT', amount: 1n },
         ]),
       ),
@@ -79,8 +107,16 @@ describe('assertValidJournal', () => {
     expect(() =>
       assertValidJournal(
         draft([
-          { account: { kind: AccountKind.FEE_REVENUE, currency: Currency.IRT, userId: 'u' }, direction: 'DEBIT', amount: 1n },
-          { account: userAccount('u', Currency.IRT, AccountKind.USER_AVAILABLE), direction: 'CREDIT', amount: 1n },
+          {
+            account: { kind: AccountKind.FEE_REVENUE, currency: Currency.IRT, userId: 'u' },
+            direction: 'DEBIT',
+            amount: 1n,
+          },
+          {
+            account: userAccount('u', Currency.IRT, AccountKind.USER_AVAILABLE),
+            direction: 'CREDIT',
+            amount: 1n,
+          },
         ]),
       ),
     ).toThrow('cannot have a userId');
@@ -96,6 +132,8 @@ describe('assertValidJournal', () => {
         ]),
       ),
     ).toThrow('appears twice');
-    expect(() => assertValidJournal(draft([{ account: a, direction: 'DEBIT', amount: 1n }]))).toThrow('two lines');
+    expect(() => assertValidJournal(draft([{ account: a, direction: 'DEBIT', amount: 1n }]))).toThrow(
+      'two lines',
+    );
   });
 });

@@ -31,7 +31,9 @@ export class TransfersService {
     return this.idempotency.execute({ scope: 'transfers.create', key, request: dto }, async (manager) => {
       const sender = await this.ledger.getUserBalance(manager, dto.fromUserId, dto.currency);
       if (sender.receivable > 0n) {
-        throw Errors.accountRestricted('sender has an outstanding debt; transfers are suspended until it is settled');
+        throw Errors.accountRestricted(
+          'sender has an outstanding debt; transfers are suspended until it is settled',
+        );
       }
       const id = uuidv7();
       const posted = await this.ledger.post(manager, {

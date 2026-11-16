@@ -54,7 +54,12 @@ describe('concurrency across two service instances (real PostgreSQL)', () => {
   it('100 concurrent withdrawals on one balance: exactly the affordable ones succeed, never negative', async () => {
     const userId = uniqueUser('race');
     await fund(a, userId, '10000000'); // affords exactly 40 x 250,000
-    const responses = await fire(100, () => ({ userId, currency: 'IRT', amount: '250000', destination: VALID_IBAN }));
+    const responses = await fire(100, () => ({
+      userId,
+      currency: 'IRT',
+      amount: '250000',
+      destination: VALID_IBAN,
+    }));
 
     expect(tally(responses)).toEqual({ '201': 40, '422 INSUFFICIENT_FUNDS': 60 });
     expect(await wallet(a, userId)).toMatchObject({ available: '0', held: '10000000', total: '10000000' });
@@ -69,10 +74,18 @@ describe('concurrency across two service instances (real PostgreSQL)', () => {
   it('100 concurrent withdrawals with plenty of money: the 200M Toman daily cap is never exceeded', async () => {
     const userId = uniqueUser('cap');
     await fund(a, userId, '1000000000');
-    const responses = await fire(100, () => ({ userId, currency: 'IRT', amount: '3000000', destination: VALID_IBAN }));
+    const responses = await fire(100, () => ({
+      userId,
+      currency: 'IRT',
+      amount: '3000000',
+      destination: VALID_IBAN,
+    }));
 
     expect(tally(responses)).toEqual({ '201': 66, '422 DAILY_LIMIT_EXCEEDED': 34 }); // 66 x 3M = 198M <= 200M
-    const [usage] = await a.dataSource.query(`SELECT used_irt FROM withdrawal_daily_usage WHERE user_id = $1`, [userId]);
+    const [usage] = await a.dataSource.query(
+      `SELECT used_irt FROM withdrawal_daily_usage WHERE user_id = $1`,
+      [userId],
+    );
     expect(usage.used_irt).toBe('198000000');
     expect(await wallet(a, userId)).toMatchObject({ available: '802000000', held: '198000000' });
   });
@@ -139,7 +152,12 @@ describe('concurrency across two service instances (real PostgreSQL)', () => {
   it('two dispatchers racing over the same pending withdrawals submit each exactly once', async () => {
     const userId = uniqueUser('disp');
     await fund(a, userId, '100000000');
-    const created = await fire(30, () => ({ userId, currency: 'IRT', amount: '100000', destination: VALID_IBAN }));
+    const created = await fire(30, () => ({
+      userId,
+      currency: 'IRT',
+      amount: '100000',
+      destination: VALID_IBAN,
+    }));
     const ids = created.map((r) => (r.body as { withdrawalId: string }).withdrawalId);
     await drainDispatchers();
     for (const id of ids) expect(sharedPayout.creations.get(id)).toBe(1);
@@ -159,7 +177,9 @@ describe('concurrency across two service instances (real PostgreSQL)', () => {
     sharedPayout.complete(id, 'SUCCEEDED');
     await a.dataSource.query(`UPDATE withdrawals SET next_attempt_at = now() WHERE id = $1`, [id]);
     await Promise.all([
-      ...Array.from({ length: 10 }, (_, i) => payoutWebhook(instance(i), { requestId: id, status: 'SUCCEEDED' })),
+      ...Array.from({ length: 10 }, (_, i) =>
+        payoutWebhook(instance(i), { requestId: id, status: 'SUCCEEDED' }),
+      ),
       a.dispatcher.runOnce(),
       b.dispatcher.runOnce(),
     ]);

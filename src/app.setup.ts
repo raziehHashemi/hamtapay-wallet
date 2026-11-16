@@ -17,7 +17,10 @@ function firstMessage(errors: ValidationError[]): string {
 /** Shared by main.ts and the test harness so tests exercise exactly the production HTTP pipeline. */
 export function configureApp(app: INestApplication): void {
   const access = new Logger('HTTP');
-  const express = app.getHttpAdapter().getInstance() as { disable?: (s: string) => void; set?: (k: string, v: unknown) => void };
+  const express = app.getHttpAdapter().getInstance() as {
+    disable?: (s: string) => void;
+    set?: (k: string, v: unknown) => void;
+  };
   express.disable?.('x-powered-by');
   express.set?.('trust proxy', true);
 
@@ -27,7 +30,9 @@ export function configureApp(app: INestApplication): void {
     const started = Date.now();
     res.on('finish', () => {
       if (req.path.startsWith('/health')) return;
-      access.log(`${req.method} ${req.originalUrl} ${res.statusCode} ${Date.now() - started}ms rid=${requestId}`);
+      access.log(
+        `${req.method} ${req.originalUrl} ${res.statusCode} ${Date.now() - started}ms rid=${requestId}`,
+      );
     });
     next();
   });

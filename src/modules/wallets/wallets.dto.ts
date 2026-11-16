@@ -59,7 +59,10 @@ export class LedgerItemDto {
   currency: Currency;
   @ApiProperty({ enum: ['AVAILABLE', 'HELD', 'RECEIVABLE'] })
   account: string;
-  @ApiProperty({ enum: ['DEBIT', 'CREDIT'], description: 'CREDIT increases a user balance, DEBIT decreases it' })
+  @ApiProperty({
+    enum: ['DEBIT', 'CREDIT'],
+    description: 'CREDIT increases a user balance, DEBIT decreases it',
+  })
   direction: string;
   @ApiProperty({ example: '250000' })
   amount: string;

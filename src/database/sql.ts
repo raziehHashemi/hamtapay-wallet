@@ -5,7 +5,11 @@ import { EntityManager, QueryFailedError } from 'typeorm';
  * `[rows, count]` for UPDATE/DELETE, which is easy to get wrong in money code).
  * When `manager` is transactional, the statement runs inside that transaction.
  */
-export async function queryRows<T>(manager: EntityManager, sql: string, params: unknown[] = []): Promise<T[]> {
+export async function queryRows<T>(
+  manager: EntityManager,
+  sql: string,
+  params: unknown[] = [],
+): Promise<T[]> {
   const runner = manager.queryRunner ?? manager.connection.createQueryRunner();
   const owned = !manager.queryRunner;
   try {
@@ -16,7 +20,11 @@ export async function queryRows<T>(manager: EntityManager, sql: string, params: 
   }
 }
 
-export async function queryOne<T>(manager: EntityManager, sql: string, params: unknown[] = []): Promise<T | null> {
+export async function queryOne<T>(
+  manager: EntityManager,
+  sql: string,
+  params: unknown[] = [],
+): Promise<T | null> {
   const rows = await queryRows<T>(manager, sql, params);
   return rows[0] ?? null;
 }

@@ -1,10 +1,9 @@
-/* eslint-disable no-console */
 /**
  * Black-box probe of the external-services simulator. Every request/response and every inbound
  * callback/webhook is written to docs/evidence/simulator-probe.log; docs/provider-notes.md quotes from it.
  *
- *   docker compose -f docker-compose.probe.yml up -d     # simulator only, webhooks pointed at this script
- *   npm run probe:simulator
+ *   docker compose -p hamtapay-probe -f docker-compose.probe.yml up -d   # simulator on :18080
+ *   SIM_URL=http://localhost:18080 SIM_ADMIN_KEY=probe-admin-key npm run probe:simulator
  *
  * Env: SIM_URL (http://localhost:8080), HOOK_PORT (39999), HOOK_HOST (host.docker.internal),
  *      SIM_ADMIN_KEY (enables deterministic scenarios), HOSTILE_SAMPLES (40)
@@ -24,7 +23,6 @@ const OUT_DIR = join(__dirname, '..', 'docs', 'evidence');
 const LOG = join(OUT_DIR, 'simulator-probe.log');
 
 const VALID_IBAN = 'IR820540102680020817909002';
-const VALID_TRC20 = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
 
 interface Inbound {
   at: number;
@@ -62,7 +60,9 @@ async function call(method: string, path: string, body?: unknown, timeoutMs = 60
       signal: AbortSignal.timeout(timeoutMs),
     });
     const text = await res.text();
-    log(`${method} ${path} ${body ? JSON.stringify(body) : ''} -> ${res.status} ${text.slice(0, 400)} (${Date.now() - started}ms)`);
+    log(
+      `${method} ${path} ${body ? JSON.stringify(body) : ''} -> ${res.status} ${text.slice(0, 400)} (${Date.now() - started}ms)`,
+    );
     let json: Record<string, unknown> = {};
     try {
       json = JSON.parse(text);
@@ -71,7 +71,9 @@ async function call(method: string, path: string, body?: unknown, timeoutMs = 60
     }
     return { status: res.status, text, json };
   } catch (error) {
-    log(`${method} ${path} ${body ? JSON.stringify(body) : ''} -> TRANSPORT ERROR ${(error as Error).name}: ${(error as Error).message} (${Date.now() - started}ms)`);
+    log(
+      `${method} ${path} ${body ? JSON.stringify(body) : ''} -> TRANSPORT ERROR ${(error as Error).name}: ${(error as Error).message} (${Date.now() - started}ms)`,
+    );
     return { status: 0, text: '', json: {} as Record<string, unknown> };
   }
 }
@@ -99,12 +101,16 @@ function startListener(): Promise<void> {
     const entry: Inbound = {
       at: Date.now(),
       path: req.url ?? '',
-      headers: { 'x-signature': req.headers['x-signature'] as string, 'x-event-id': req.headers['x-event-id'] as string },
+      headers: {
+        'x-signature': req.headers['x-signature'] as string,
+        'x-event-id': req.headers['x-event-id'] as string,
+      },
       raw,
       json,
     };
     if (entry.headers['x-signature']) {
-      entry.signatureValid = createHmac('sha256', SECRET).update(raw).digest('hex') === entry.headers['x-signature'];
+      entry.signatureValid =
+        createHmac('sha256', SECRET).update(raw).digest('hex') === entry.headers['x-signature'];
     }
     inbound.push(entry);
     const eventId = entry.headers['x-event-id'];
@@ -113,7 +119,9 @@ function startListener(): Promise<void> {
     if (failThis) alreadyFailedEvents.add(eventId!);
     log(
       `<<< INBOUND ${req.method} ${entry.path} ${raw}` +
-        (entry.headers['x-signature'] ? ` sig=${entry.headers['x-signature'].slice(0, 12)}… valid=${entry.signatureValid}` : '') +
+        (entry.headers['x-signature']
+          ? ` sig=${entry.headers['x-signature'].slice(0, 12)}… valid=${entry.signatureValid}`
+          : '') +
         (eventId ? ` x-event-id=${eventId}` : '') +
         (failThis ? ' -> answering 500 on purpose' : ''),
     );
@@ -123,20 +131,33 @@ function startListener(): Promise<void> {
   return new Promise((resolve) => server.listen(HOOK_PORT, '0.0.0.0', () => resolve()));
 }
 
-const callbacksFor = (token: string) => inbound.filter((i) => i.path.startsWith('/callback') && i.json.token === token);
-const webhooksFor = (requestId: string) => inbound.filter((i) => i.path.startsWith('/webhook') && i.json.requestId === requestId);
+const callbacksFor = (token: string) =>
+  inbound.filter((i) => i.path.startsWith('/callback') && i.json.token === token);
+const webhooksFor = (requestId: string) =>
+  inbound.filter((i) => i.path.startsWith('/webhook') && i.json.requestId === requestId);
 
 async function newPayment(amountRial = '1000000', scenario?: string[]) {
   if (scenario) await admin('scenario', { payment: [scenario] });
   const orderId = `probe-${randomUUID().slice(0, 8)}`;
-  const created = await call('POST', '/psp/payments', { amount: amountRial, callbackUrl: `${HOOK_BASE}/callback`, orderId });
+  const created = await call('POST', '/psp/payments', {
+    amount: amountRial,
+    callbackUrl: `${HOOK_BASE}/callback`,
+    orderId,
+  });
   return { token: String(created.json.token), orderId, created };
 }
 
 async function newPayout(scenario?: string[], overrides: Record<string, unknown> = {}, timeoutMs = 60000) {
   if (scenario) await admin('scenario', { payout: [scenario] });
   const requestId = `probe-${randomUUID()}`;
-  const body = { requestId, type: 'IBAN', destination: VALID_IBAN, amount: '1000000', currency: 'IRR', ...overrides };
+  const body = {
+    requestId,
+    type: 'IBAN',
+    destination: VALID_IBAN,
+    amount: '1000000',
+    currency: 'IRR',
+    ...overrides,
+  };
   const res = await call('POST', '/payout/transfers', body, timeoutMs);
   return { requestId, body, res };
 }
@@ -166,10 +187,16 @@ async function deterministic(): Promise<void> {
 
   section('E2 PSP validation: minimum amount and integer-only');
   await call('POST', '/psp/payments', { amount: '9999', callbackUrl: `${HOOK_BASE}/callback`, orderId: 'x' });
-  await call('POST', '/psp/payments', { amount: '10000.5', callbackUrl: `${HOOK_BASE}/callback`, orderId: 'x' });
+  await call('POST', '/psp/payments', {
+    amount: '10000.5',
+    callbackUrl: `${HOOK_BASE}/callback`,
+    orderId: 'x',
+  });
   await call('POST', '/psp/payments', { amount: '10000', orderId: 'no-callback' });
 
-  section('E3 verify BEFORE the payer paid returns HTTP 200 code -51 FAILED (indistinguishable from a real failure)');
+  section(
+    'E3 verify BEFORE the payer paid returns HTTP 200 code -51 FAILED (indistinguishable from a real failure)',
+  );
   {
     const p = await newPayment();
     await call('POST', '/psp/verify', { token: p.token });
@@ -179,7 +206,9 @@ async function deterministic(): Promise<void> {
     await call('POST', '/psp/verify', { token: p.token });
   }
 
-  section('E4 happy path callback: status OK/NOK (not SUCCESS/FAILED), unsigned; verify is idempotent (code 101)');
+  section(
+    'E4 happy path callback: status OK/NOK (not SUCCESS/FAILED), unsigned; verify is idempotent (code 101)',
+  );
   {
     const p = await newPayment('1000000', []);
     await call('POST', `/psp/pay/${p.token}`, { result: 'success' });
@@ -259,9 +288,27 @@ async function deterministic(): Promise<void> {
 
   section('E12 payout validation: IBAN needs IRR integer; destination checked only later (async FAILED)');
   {
-    await call('POST', '/payout/transfers', { requestId: 'short', type: 'IBAN', destination: VALID_IBAN, amount: '1', currency: 'IRR' });
-    await call('POST', '/payout/transfers', { requestId: `probe-${randomUUID()}`, type: 'IBAN', destination: VALID_IBAN, amount: '100.5', currency: 'IRR' });
-    await call('POST', '/payout/transfers', { requestId: `probe-${randomUUID()}`, type: 'IBAN', destination: VALID_IBAN, amount: '1000', currency: 'IRT' });
+    await call('POST', '/payout/transfers', {
+      requestId: 'short',
+      type: 'IBAN',
+      destination: VALID_IBAN,
+      amount: '1',
+      currency: 'IRR',
+    });
+    await call('POST', '/payout/transfers', {
+      requestId: `probe-${randomUUID()}`,
+      type: 'IBAN',
+      destination: VALID_IBAN,
+      amount: '100.5',
+      currency: 'IRR',
+    });
+    await call('POST', '/payout/transfers', {
+      requestId: `probe-${randomUUID()}`,
+      type: 'IBAN',
+      destination: VALID_IBAN,
+      amount: '1000',
+      currency: 'IRT',
+    });
     const bad = await newPayout([], { destination: 'IR000000000000000000000000' });
     await waitFor(() => webhooksFor(bad.requestId).some((w) => w.json.status === 'FAILED'), 15000);
     await call('GET', `/payout/transfers/${bad.requestId}`);
@@ -274,14 +321,20 @@ async function deterministic(): Promise<void> {
     await call('POST', '/payout/transfers', p.body);
   }
 
-  section('E14 503 AFTER create (e503-after): transfer IS created, GET hides it (404) for 90s/scale; re-POST reveals it');
+  section(
+    'E14 503 AFTER create (e503-after): transfer IS created, GET hides it (404) for 90s/scale; re-POST reveals it',
+  );
   {
     const p = await newPayout(['e503-after']);
     await call('GET', `/payout/transfers/${p.requestId}`);
     await call('POST', '/payout/transfers', p.body);
     await sleep(3000);
     await call('GET', `/payout/transfers/${p.requestId}`);
-    log(`webhooks already received for this "failed" request: ${webhooksFor(p.requestId).map((w) => w.json.status).join(', ')}`);
+    log(
+      `webhooks already received for this "failed" request: ${webhooksFor(p.requestId)
+        .map((w) => w.json.status)
+        .join(', ')}`,
+    );
   }
 
   section('E15 timeout (timeout): connection held then destroyed; transfer created and hidden');
@@ -296,7 +349,9 @@ async function deterministic(): Promise<void> {
     const p = await newPayout(['dupWh', 'staleWh']);
     await sleep(8000);
     for (const w of webhooksFor(p.requestId)) {
-      log(`  webhook status=${w.json.status} eventId=${w.json.eventId} occurredAt=${w.json.occurredAt} sigValid=${w.signatureValid}`);
+      log(
+        `  webhook status=${w.json.status} eventId=${w.json.eventId} occurredAt=${w.json.occurredAt} sigValid=${w.signatureValid}`,
+      );
     }
   }
 
@@ -314,7 +369,11 @@ async function deterministic(): Promise<void> {
   {
     const p = await newPayout(['missWh']);
     await sleep(6000);
-    log(`  webhooks: ${webhooksFor(p.requestId).map((w) => w.json.status).join(', ')}`);
+    log(
+      `  webhooks: ${webhooksFor(p.requestId)
+        .map((w) => w.json.status)
+        .join(', ')}`,
+    );
     await call('GET', `/payout/transfers/${p.requestId}`);
   }
 
@@ -322,7 +381,11 @@ async function deterministic(): Promise<void> {
   {
     const p = await newPayout(['returned']);
     await waitFor(() => webhooksFor(p.requestId).some((w) => w.json.status === 'RETURNED'), 60000);
-    log(`  webhooks: ${webhooksFor(p.requestId).map((w) => `${w.json.status}@${w.json.occurredAt}`).join(', ')}`);
+    log(
+      `  webhooks: ${webhooksFor(p.requestId)
+        .map((w) => `${w.json.status}@${w.json.occurredAt}`)
+        .join(', ')}`,
+    );
     await call('GET', `/payout/transfers/${p.requestId}`);
   }
 
@@ -347,7 +410,9 @@ async function deterministic(): Promise<void> {
     });
     await sleep(10000);
     for (const w of webhooksFor(requestId)) {
-      log(`  delivery status=${w.json.status} eventId=${w.json.eventId} at=+${((w.at - t0) / 1000).toFixed(2)}s`);
+      log(
+        `  delivery status=${w.json.status} eventId=${w.json.eventId} at=+${((w.at - t0) / 1000).toFixed(2)}s`,
+      );
     }
   }
 
@@ -361,13 +426,17 @@ async function deterministic(): Promise<void> {
     writeFileSync(join(OUT_DIR, 'settlement-sample.csv'), raw);
     log(`full CSV written to docs/evidence/settlement-sample.csv (${csv.text.split('\n').length} lines)`);
     const again = await call('GET', `/psp/settlement?date=${today}`);
-    log(`second fetch identical: ${createHash('sha256').update(csv.text).digest('hex') === createHash('sha256').update(again.text).digest('hex')}`);
+    log(
+      `second fetch identical: ${createHash('sha256').update(csv.text).digest('hex') === createHash('sha256').update(again.text).digest('hex')}`,
+    );
     await call('GET', `/psp/settlement?date=not-a-date`);
   }
 }
 
 async function hostileStatistics(): Promise<void> {
-  section(`H hostile-mode statistics over ${SAMPLES} payments and ${SAMPLES} payouts (random chaos, no scenarios)`);
+  section(
+    `H hostile-mode statistics over ${SAMPLES} payments and ${SAMPLES} payouts (random chaos, no scenarios)`,
+  );
   if (ADMIN_KEY) await admin('chaos', { profile: 'hostile' });
   const tally: Record<string, number> = {};
   const inc = (k: string) => (tally[k] = (tally[k] ?? 0) + 1);
@@ -375,7 +444,11 @@ async function hostileStatistics(): Promise<void> {
   const payments = await Promise.all(
     Array.from({ length: SAMPLES }, async () => {
       const orderId = `stat-${randomUUID().slice(0, 8)}`;
-      const created = await call('POST', '/psp/payments', { amount: '500000', callbackUrl: `${HOOK_BASE}/callback`, orderId });
+      const created = await call('POST', '/psp/payments', {
+        amount: '500000',
+        callbackUrl: `${HOOK_BASE}/callback`,
+        orderId,
+      });
       const token = String(created.json.token);
       await call('POST', `/psp/pay/${token}`, { result: 'success' });
       return token;
@@ -384,7 +457,12 @@ async function hostileStatistics(): Promise<void> {
   const payouts = await Promise.all(
     Array.from({ length: SAMPLES }, async () => {
       const requestId = `stat-${randomUUID()}`;
-      const r = await call('POST', '/payout/transfers', { requestId, type: 'IBAN', destination: VALID_IBAN, amount: '1000000', currency: 'IRR' }, 15000);
+      const r = await call(
+        'POST',
+        '/payout/transfers',
+        { requestId, type: 'IBAN', destination: VALID_IBAN, amount: '1000000', currency: 'IRR' },
+        15000,
+      );
       if (r.status === 503) inc('payout POST 503');
       if (r.status === 0) inc('payout POST timeout/reset');
       return requestId;
@@ -408,8 +486,10 @@ async function hostileStatistics(): Promise<void> {
     if (new Set(ids).size < ids.length) inc('payout: duplicate webhook delivery');
     if (whs.some((w) => w.signatureValid === false)) inc('payout: forged (bad signature) webhook');
     const finalIdx = statuses.findIndex((s) => s === 'SUCCEEDED' || s === 'FAILED');
-    if (finalIdx >= 0 && statuses.slice(finalIdx + 1).includes('PROCESSING')) inc('payout: stale PROCESSING after final');
-    if (!whs.some((w) => w.signatureValid && (w.json.status === 'SUCCEEDED' || w.json.status === 'FAILED'))) inc('payout: no signed final webhook (yet)');
+    if (finalIdx >= 0 && statuses.slice(finalIdx + 1).includes('PROCESSING'))
+      inc('payout: stale PROCESSING after final');
+    if (!whs.some((w) => w.signatureValid && (w.json.status === 'SUCCEEDED' || w.json.status === 'FAILED')))
+      inc('payout: no signed final webhook (yet)');
     if (statuses.includes('RETURNED')) inc('payout: RETURNED after SUCCEEDED');
   }
   log('observed counts: ' + JSON.stringify(tally, null, 0));

@@ -21,10 +21,12 @@ describe('cursor', () => {
   it('round-trips', () => {
     expect(decodeCursor(encodeCursor('12345'))).toBe('12345');
   });
-  it.each(['', 'garbage', Buffer.from('le:abc').toString('base64url'), Buffer.from('xx:1').toString('base64url')])(
-    'rejects %p',
-    (c) => expect(decodeCursor(c)).toBeNull(),
-  );
+  it.each([
+    '',
+    'garbage',
+    Buffer.from('le:abc').toString('base64url'),
+    Buffer.from('xx:1').toString('base64url'),
+  ])('rejects %p', (c) => expect(decodeCursor(c)).toBeNull());
 });
 
 describe('uuidv7', () => {
@@ -46,7 +48,9 @@ describe('uuidv7', () => {
 
 describe('exponentialBackoffMs', () => {
   it('doubles and caps', () => {
-    expect([0, 1, 2, 3, 10].map((n) => exponentialBackoffMs(n, 1000, 5000))).toEqual([1000, 2000, 4000, 5000, 5000]);
+    expect([0, 1, 2, 3, 10].map((n) => exponentialBackoffMs(n, 1000, 5000))).toEqual([
+      1000, 2000, 4000, 5000, 5000,
+    ]);
   });
   it('treats negative attempts as zero', () => {
     expect(exponentialBackoffMs(-3, 1000, 5000)).toBe(1000);

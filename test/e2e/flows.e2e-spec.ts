@@ -22,7 +22,8 @@ import {
 describe('E2E: wallet service + simulator', () => {
   beforeAll(async () => {
     const health = await api.get('/health');
-    if (health.status !== 200) throw new Error(`stack is not up at ${process.env.E2E_BASE_URL ?? 'http://localhost:3000'}`);
+    if (health.status !== 200)
+      throw new Error(`stack is not up at ${process.env.E2E_BASE_URL ?? 'http://localhost:3000'}`);
     const cfg = await sim.config();
     if (cfg.status !== 200) throw new Error('simulator admin API not reachable (SIM_ADMIN_KEY?)');
     await sim.chaos('off'); // deterministic: only the scenarios we queue misbehave
@@ -33,7 +34,10 @@ describe('E2E: wallet service + simulator', () => {
 
   it('exposes the contract: zero wallet for a new user, OpenAPI document, health', async () => {
     const user = newUser();
-    expect((await api.get(`/wallets/${user}`)).body.balances[0]).toMatchObject({ currency: 'IRT', available: '0' });
+    expect((await api.get(`/wallets/${user}`)).body.balances[0]).toMatchObject({
+      currency: 'IRT',
+      available: '0',
+    });
     expect((await api.get('/docs-json')).body.paths['/withdrawals']).toBeDefined();
     expect((await api.get('/health')).body).toMatchObject({ status: 'ok', database: 'up', broker: 'up' });
   });
@@ -76,7 +80,12 @@ describe('E2E: wallet service + simulator', () => {
       const user = newUser();
       await fund(user, fundWith);
       if (flags) await sim.scenario('payout', flags);
-      const res = await api.post('/withdrawals', { userId: user, currency: 'IRT', amount, destination: IBAN });
+      const res = await api.post('/withdrawals', {
+        userId: user,
+        currency: 'IRT',
+        amount,
+        destination: IBAN,
+      });
       expect(res.status).toBe(201);
       return { user, id: res.body.withdrawalId as string };
     }
@@ -84,7 +93,10 @@ describe('E2E: wallet service + simulator', () => {
 
     it('happy path: paid out in Rial, settled, exactly one provider transfer', async () => {
       const { user, id } = await withdrawal([]);
-      expect(await waitWithdrawal(id)).toMatchObject({ status: 'SUCCEEDED', trackingId: expect.stringMatching(/^TRK/) });
+      expect(await waitWithdrawal(id)).toMatchObject({
+        status: 'SUCCEEDED',
+        trackingId: expect.stringMatching(/^TRK/),
+      });
       const transfers = await providerView(id);
       expect(transfers).toHaveLength(1);
       expect(transfers[0]).toMatchObject({ amount: '1000000', currency: 'IRR', executed: true });
@@ -111,7 +123,10 @@ describe('E2E: wallet service + simulator', () => {
 
     it('bank rejection -> FAILED and the money is available again', async () => {
       const { user, id } = await withdrawal(['fail']);
-      expect(await waitWithdrawal(id)).toMatchObject({ status: 'FAILED', failureReason: 'PROVIDER_FAILED:BANK_REJECTED' });
+      expect(await waitWithdrawal(id)).toMatchObject({
+        status: 'FAILED',
+        failureReason: 'PROVIDER_FAILED:BANK_REJECTED',
+      });
       expect(await balance(user)).toMatchObject({ available: '1000000', held: '0' });
     });
 
@@ -130,7 +145,12 @@ describe('E2E: wallet service + simulator', () => {
     it('USDT to TRC20 with the 1 USDT fee', async () => {
       const user = newUser();
       await fund(user, '50', 'USDT');
-      const res = await api.post('/withdrawals', { userId: user, currency: 'USDT', amount: '20.5', destination: TRC20 });
+      const res = await api.post('/withdrawals', {
+        userId: user,
+        currency: 'USDT',
+        amount: '20.5',
+        destination: TRC20,
+      });
       expect(res.status).toBe(201);
       expect(await waitWithdrawal(res.body.withdrawalId)).toMatchObject({ status: 'SUCCEEDED', fee: '1' });
       expect(await balance(user, 'USDT')).toMatchObject({ available: '28.5', held: '0' });
@@ -141,13 +161,24 @@ describe('E2E: wallet service + simulator', () => {
     it('contract errors', async () => {
       const user = newUser();
       await fund(user, '150000');
-      const post = (body: object) => api.post('/withdrawals', { userId: user, currency: 'IRT', destination: IBAN, ...body });
-      expect((await post({ amount: '100000', destination: 'IR000000000000000000000000' })).body.code).toBe('INVALID_DESTINATION');
+      const post = (body: object) =>
+        api.post('/withdrawals', { userId: user, currency: 'IRT', destination: IBAN, ...body });
+      expect((await post({ amount: '100000', destination: 'IR000000000000000000000000' })).body.code).toBe(
+        'INVALID_DESTINATION',
+      );
       expect((await post({ amount: '50000' })).body.code).toBe('BELOW_MINIMUM');
       expect((await post({ amount: '200000' })).body.code).toBe('INSUFFICIENT_FUNDS');
       const k = 'e2e-reused-' + user;
-      await api.post('/withdrawals', { userId: user, currency: 'IRT', destination: IBAN, amount: '100000' }, k);
-      const reused = await api.post('/withdrawals', { userId: user, currency: 'IRT', destination: IBAN, amount: '110000' }, k);
+      await api.post(
+        '/withdrawals',
+        { userId: user, currency: 'IRT', destination: IBAN, amount: '100000' },
+        k,
+      );
+      const reused = await api.post(
+        '/withdrawals',
+        { userId: user, currency: 'IRT', destination: IBAN, amount: '110000' },
+        k,
+      );
       expect(reused).toMatchObject({ status: 422, body: { code: 'IDEMPOTENCY_KEY_REUSED' } });
     });
   });
@@ -155,7 +186,12 @@ describe('E2E: wallet service + simulator', () => {
   it('transfers between users are atomic', async () => {
     const [x, y] = [newUser(), newUser()];
     await fund(x, '300000');
-    const res = await api.post('/transfers', { fromUserId: x, toUserId: y, currency: 'IRT', amount: '120000' });
+    const res = await api.post('/transfers', {
+      fromUserId: x,
+      toUserId: y,
+      currency: 'IRT',
+      amount: '120000',
+    });
     expect(res.status).toBe(201);
     expect((await balance(x)).available).toBe('180000');
     expect((await balance(y)).available).toBe('120000');
@@ -166,17 +202,29 @@ describe('E2E: wallet service + simulator', () => {
     const res = await api.post('/reconciliation/run', { date: today }, null);
     expect(res.status).toBe(200);
     expect(res.body.summary.matched).toBeGreaterThan(0);
-    expect(res.body.mismatches.some((m: { type: string; kind: string }) => m.type === 'MISSING_IN_LEDGER' && m.kind === 'DEPOSIT')).toBe(true);
+    expect(
+      res.body.mismatches.some(
+        (m: { type: string; kind: string }) => m.type === 'MISSING_IN_LEDGER' && m.kind === 'DEPOSIT',
+      ),
+    ).toBe(true);
     expect(res.body.summary.bankFeeRows).toBeGreaterThan(0);
   });
 
   it('the ledger is intact after everything above', async () => {
-    const report = await waitUntil(async () => (await api.get('/internal/ledger/integrity')).body, (r) => r.ok, 10000);
+    const report = await waitUntil(
+      async () => (await api.get('/internal/ledger/integrity')).body,
+      (r) => r.ok,
+      10000,
+    );
     expect(report).toMatchObject({ ok: true, unbalancedJournals: [], balanceDrift: [], negativeBalances: 0 });
   });
 
   it('every committed change reached the broker (outbox drained)', async () => {
-    const health = await waitUntil(async () => (await api.get('/health')).body, (h) => h.outboxBacklog === 0, 20000);
+    const health = await waitUntil(
+      async () => (await api.get('/health')).body,
+      (h) => h.outboxBacklog === 0,
+      20000,
+    );
     expect(health.outboxBacklog).toBe(0);
   });
 
@@ -185,7 +233,9 @@ describe('E2E: wallet service + simulator', () => {
     const pendingWithdrawals = await waitUntil(
       async () => {
         const payouts = (await sim.payouts()).body;
-        const ours = await Promise.all(payouts.map(async (p) => (await api.get(`/withdrawals/${p.requestId}`)).body));
+        const ours = await Promise.all(
+          payouts.map(async (p) => (await api.get(`/withdrawals/${p.requestId}`)).body),
+        );
         return ours.filter((w) => w?.withdrawalId && !isFinal(w));
       },
       (open) => open.length === 0,

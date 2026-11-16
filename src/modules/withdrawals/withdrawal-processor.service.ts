@@ -16,7 +16,12 @@ import { AccountKind, JournalType, PostingLine, systemAccount, userAccount } fro
 import { OutboxService } from '../outbox/outbox.service';
 import { DailyLimitService } from './daily-limit.service';
 import { WithdrawalEntity, WithdrawalStatus } from './withdrawal.entity';
-import { decideTransition, FAILURE_PREFIX, isNewerProviderStatus, Transition } from './withdrawal-state-machine';
+import {
+  decideTransition,
+  FAILURE_PREFIX,
+  isNewerProviderStatus,
+  Transition,
+} from './withdrawal-state-machine';
 import { toPayoutRequest } from './withdrawal-rules';
 
 export interface ProviderObservation {
@@ -86,14 +91,20 @@ export class WithdrawalProcessor {
         await this.retryLater(w.id, 'provider answered 404 for an acknowledged transfer; waiting');
         return;
       case 'UNKNOWN':
-        this.logger.warn(`withdrawal ${w.id}: outcome unknown (${result.reason}); will retry with the same requestId`);
+        this.logger.warn(
+          `withdrawal ${w.id}: outcome unknown (${result.reason}); will retry with the same requestId`,
+        );
         await this.retryLater(w.id, result.reason);
         return;
     }
   }
 
   /** Applies a provider observation (webhook, poll or submit response). Returns the transition taken. */
-  async apply(id: string, observation: ProviderObservation, source: ObservationSource): Promise<Transition['kind']> {
+  async apply(
+    id: string,
+    observation: ProviderObservation,
+    source: ObservationSource,
+  ): Promise<Transition['kind']> {
     return this.dataSource.transaction(async (manager) => {
       const w = await this.lock(manager, id);
       if (!w) return 'NOOP';
@@ -101,7 +112,8 @@ export class WithdrawalProcessor {
       const patch: Patch = { lastError: null };
       if (!w.providerAcknowledgedAt) patch.providerAcknowledgedAt = new Date();
       if (observation.trackingId && !w.providerTrackingId) patch.providerTrackingId = observation.trackingId;
-      if (isNewerProviderStatus(w.providerStatus, observation.status)) patch.providerStatus = observation.status;
+      if (isNewerProviderStatus(w.providerStatus, observation.status))
+        patch.providerStatus = observation.status;
 
       switch (transition.kind) {
         case 'NOOP':
@@ -127,7 +139,9 @@ export class WithdrawalProcessor {
       await this.scheduleNext(manager, w, patch);
       await manager.update(WithdrawalEntity, { id }, patch);
       if (transition.kind !== 'NOOP' && transition.kind !== 'TRACK') {
-        this.logger.log(`withdrawal ${id}: ${transition.kind} via ${source} (provider ${observation.status})`);
+        this.logger.log(
+          `withdrawal ${id}: ${transition.kind} via ${source} (provider ${observation.status})`,
+        );
       }
       return transition.kind;
     });
@@ -187,11 +201,23 @@ export class WithdrawalProcessor {
 
   private async settle(manager: EntityManager, w: WithdrawalEntity, patch: Patch, obs: ProviderObservation) {
     const lines: PostingLine[] = [
-      { account: userAccount(w.userId, w.currency, AccountKind.USER_HELD), direction: 'DEBIT', amount: w.amount + w.fee },
-      { account: systemAccount(w.currency, AccountKind.PAYOUT_CLEARING), direction: 'CREDIT', amount: w.amount },
+      {
+        account: userAccount(w.userId, w.currency, AccountKind.USER_HELD),
+        direction: 'DEBIT',
+        amount: w.amount + w.fee,
+      },
+      {
+        account: systemAccount(w.currency, AccountKind.PAYOUT_CLEARING),
+        direction: 'CREDIT',
+        amount: w.amount,
+      },
     ];
     if (w.fee > 0n) {
-      lines.push({ account: systemAccount(w.currency, AccountKind.FEE_REVENUE), direction: 'CREDIT', amount: w.fee });
+      lines.push({
+        account: systemAccount(w.currency, AccountKind.FEE_REVENUE),
+        direction: 'CREDIT',
+        amount: w.fee,
+      });
     }
     const posted = await this.ledger.post(manager, {
       type: JournalType.WITHDRAWAL_SETTLE,
@@ -208,7 +234,9 @@ export class WithdrawalProcessor {
       finalizedAt: new Date(),
       attempts: 0,
     });
-    await this.event(manager, 'withdrawal.succeeded', w, { trackingId: patch.providerTrackingId ?? w.providerTrackingId });
+    await this.event(manager, 'withdrawal.succeeded', w, {
+      trackingId: patch.providerTrackingId ?? w.providerTrackingId,
+    });
   }
 
   private async release(manager: EntityManager, w: WithdrawalEntity, patch: Patch, reason: string) {
@@ -237,7 +265,11 @@ export class WithdrawalProcessor {
     obs: ProviderObservation,
   ) {
     const lines: PostingLine[] = [
-      { account: systemAccount(w.currency, AccountKind.PAYOUT_CLEARING), direction: 'DEBIT', amount: w.amount },
+      {
+        account: systemAccount(w.currency, AccountKind.PAYOUT_CLEARING),
+        direction: 'DEBIT',
+        amount: w.amount,
+      },
       {
         account: userAccount(w.userId, w.currency, AccountKind.USER_AVAILABLE),
         direction: 'CREDIT',
@@ -245,7 +277,11 @@ export class WithdrawalProcessor {
       },
     ];
     if (w.fee > 0n) {
-      lines.push({ account: systemAccount(w.currency, AccountKind.FEE_REVENUE), direction: 'DEBIT', amount: w.fee });
+      lines.push({
+        account: systemAccount(w.currency, AccountKind.FEE_REVENUE),
+        direction: 'DEBIT',
+        amount: w.fee,
+      });
     }
     const posted = await this.ledger.post(manager, {
       type: JournalType.WITHDRAWAL_RETURN,
@@ -272,16 +308,29 @@ export class WithdrawalProcessor {
    * from the user's available balance as far as possible and book the rest as a receivable (the balance never
    * goes negative), then block further withdrawals/transfers and hand the case to operations.
    */
-  private async lateSuccess(manager: EntityManager, w: WithdrawalEntity, patch: Patch, obs: ProviderObservation) {
+  private async lateSuccess(
+    manager: EntityManager,
+    w: WithdrawalEntity,
+    patch: Patch,
+    obs: ProviderObservation,
+  ) {
     const total = w.amount + w.fee;
     const balance = await this.ledger.lockUserBalance(manager, w.userId, w.currency);
     const fromAvailable = balance.available < total ? balance.available : total;
     const debt = total - fromAvailable;
     const lines: PostingLine[] = [
-      { account: systemAccount(w.currency, AccountKind.PAYOUT_CLEARING), direction: 'CREDIT', amount: w.amount },
+      {
+        account: systemAccount(w.currency, AccountKind.PAYOUT_CLEARING),
+        direction: 'CREDIT',
+        amount: w.amount,
+      },
     ];
     if (w.fee > 0n) {
-      lines.push({ account: systemAccount(w.currency, AccountKind.FEE_REVENUE), direction: 'CREDIT', amount: w.fee });
+      lines.push({
+        account: systemAccount(w.currency, AccountKind.FEE_REVENUE),
+        direction: 'CREDIT',
+        amount: w.fee,
+      });
     }
     if (fromAvailable > 0n) {
       lines.push({
@@ -340,9 +389,15 @@ export class WithdrawalProcessor {
       patch.nextAttemptAt = new Date(
         now + exponentialBackoffMs(attempts - 1, POLL_BASE_MS, this.config.workers.withdrawalPollCapMs),
       );
-      const overdue = w.submittedAt && now - w.submittedAt.getTime() > this.config.workers.withdrawalReviewAfterMs;
+      const overdue =
+        w.submittedAt && now - w.submittedAt.getTime() > this.config.workers.withdrawalReviewAfterMs;
       if (overdue && !w.needsReview && !patch.needsReview) {
-        await this.flag(manager, w, patch, 'NO_FINAL_ANSWER_FROM_PROVIDER (funds stay held; never auto-failed)');
+        await this.flag(
+          manager,
+          w,
+          patch,
+          'NO_FINAL_ANSWER_FROM_PROVIDER (funds stay held; never auto-failed)',
+        );
       }
       return;
     }
@@ -357,7 +412,12 @@ export class WithdrawalProcessor {
       : null;
   }
 
-  private async event(manager: EntityManager, type: string, w: WithdrawalEntity, extra: Record<string, unknown>) {
+  private async event(
+    manager: EntityManager,
+    type: string,
+    w: WithdrawalEntity,
+    extra: Record<string, unknown>,
+  ) {
     await this.outbox.enqueue(manager, {
       type,
       aggregateType: 'withdrawal',
@@ -374,7 +434,9 @@ export class WithdrawalProcessor {
   }
 
   private lock(manager: EntityManager, id: string): Promise<WithdrawalEntity | null> {
-    return manager.getRepository(WithdrawalEntity).findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+    return manager
+      .getRepository(WithdrawalEntity)
+      .findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
   }
 }
 

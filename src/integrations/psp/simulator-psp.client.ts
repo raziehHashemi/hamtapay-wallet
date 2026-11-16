@@ -76,7 +76,8 @@ export class SimulatorPspClient extends PaymentGateway {
       };
     }
     if (code === CODE_EXPIRED) return { kind: 'EXPIRED', code, message: String(body.message ?? body.status) };
-    if (code === CODE_NOT_PAID) return { kind: 'NOT_PAID', code, message: String(body.message ?? body.status) };
+    if (code === CODE_NOT_PAID)
+      return { kind: 'NOT_PAID', code, message: String(body.message ?? body.status) };
     this.logger.warn(`unexpected verify response: ${res.text.slice(0, 200)}`);
     return { kind: 'UNAVAILABLE', reason: `unexpected verify code ${code}` };
   }

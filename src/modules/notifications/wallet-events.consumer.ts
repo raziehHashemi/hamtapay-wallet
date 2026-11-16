@@ -1,4 +1,11 @@
-import { Inject, Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown, Optional } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnApplicationBootstrap,
+  OnApplicationShutdown,
+  Optional,
+} from '@nestjs/common';
 import type { Channel, ConsumeMessage } from 'amqplib';
 import { AppConfig } from '../../config/app-config';
 import type { EventEnvelope } from '../outbox/outbox.service';
@@ -40,7 +47,9 @@ export class WalletEventsConsumer implements OnApplicationBootstrap, OnApplicati
       await channel.prefetch(20);
       channel.on('close', () => this.scheduleResubscribe());
       channel.on('error', (error: Error) => this.logger.warn(`channel error: ${error.message}`));
-      await channel.consume(NOTIFICATIONS_QUEUE, (msg) => void this.onMessage(channel, msg), { noAck: false });
+      await channel.consume(NOTIFICATIONS_QUEUE, (msg) => void this.onMessage(channel, msg), {
+        noAck: false,
+      });
       this.channel = channel;
       this.logger.log(`consuming ${NOTIFICATIONS_QUEUE}`);
     } catch (error) {

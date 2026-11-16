@@ -14,16 +14,32 @@ describe('deposits (real PostgreSQL, fake PSP with the simulator behaviours)', (
   afterAll(() => t.close());
 
   async function createDeposit(amount = '500000', userId = uniqueUser()) {
-    const res = await t.http.post('/deposits').set('Idempotency-Key', key()).send({ userId, amount }).expect(201);
-    return { userId, depositId: res.body.depositId as string, token: t.psp.tokenFromUrl(res.body.paymentUrl), body: res.body };
+    const res = await t.http
+      .post('/deposits')
+      .set('Idempotency-Key', key())
+      .send({ userId, amount })
+      .expect(201);
+    return {
+      userId,
+      depositId: res.body.depositId as string,
+      token: t.psp.tokenFromUrl(res.body.paymentUrl),
+      body: res.body,
+    };
   }
   const callback = (token: string, status = 'OK', extra: Record<string, unknown> = {}) =>
-    t.http.post('/webhooks/psp/callback').send({ token, orderId: undefined, status, ...extra }).expect(200);
+    t.http
+      .post('/webhooks/psp/callback')
+      .send({ token, orderId: undefined, status, ...extra })
+      .expect(200);
   const status = async (depositId: string) => (await t.http.get(`/deposits/${depositId}`).expect(200)).body;
 
   it('registers a deposit and returns the payment link; the PSP is asked for Rial', async () => {
     const { body, token } = await createDeposit('500000');
-    expect(body).toMatchObject({ status: 'PENDING', amount: '500000', paymentUrl: expect.stringContaining(token) });
+    expect(body).toMatchObject({
+      status: 'PENDING',
+      amount: '500000',
+      paymentUrl: expect.stringContaining(token),
+    });
     const payment = t.psp.payments.get(token)!;
     expect(payment.amountRial).toBe(5_000_000n); // 500,000 Toman = 5,000,000 Rial
     expect(payment.orderId).toBe(body.depositId);
@@ -43,7 +59,11 @@ describe('deposits (real PostgreSQL, fake PSP with the simulator behaviours)', (
     const { userId, depositId, token } = await createDeposit('500000');
     t.psp.pay(token);
     await callback(token);
-    expect(await status(depositId)).toMatchObject({ status: 'SUCCEEDED', creditedAmount: '500000', refId: expect.any(String) });
+    expect(await status(depositId)).toMatchObject({
+      status: 'SUCCEEDED',
+      creditedAmount: '500000',
+      refId: expect.any(String),
+    });
     expect((await wallet(t, userId)).available).toBe('500000');
   });
 
@@ -53,7 +73,10 @@ describe('deposits (real PostgreSQL, fake PSP with the simulator behaviours)', (
     await Promise.all(Array.from({ length: 10 }, () => callback(token)));
     expect((await status(depositId)).status).toBe('SUCCEEDED');
     expect((await wallet(t, userId)).available).toBe('700000');
-    const [{ n }] = await t.dataSource.query(`SELECT count(*)::int AS n FROM ledger_journals WHERE reference_id = $1`, [depositId]);
+    const [{ n }] = await t.dataSource.query(
+      `SELECT count(*)::int AS n FROM ledger_journals WHERE reference_id = $1`,
+      [depositId],
+    );
     expect(n).toBe(1);
   });
 
@@ -136,9 +159,15 @@ describe('deposits (real PostgreSQL, fake PSP with the simulator behaviours)', (
     t.psp.pay(token);
     t.psp.payments.get(token)!.verifyAmountOverride = 4_000_000n;
     await callback(token);
-    expect(await status(depositId)).toMatchObject({ status: 'SUCCEEDED', amount: '500000', creditedAmount: '400000' });
+    expect(await status(depositId)).toMatchObject({
+      status: 'SUCCEEDED',
+      amount: '500000',
+      creditedAmount: '400000',
+    });
     expect((await wallet(t, userId)).available).toBe('400000');
-    const [row] = await t.dataSource.query(`SELECT needs_review, anomaly FROM deposits WHERE id = $1`, [depositId]);
+    const [row] = await t.dataSource.query(`SELECT needs_review, anomaly FROM deposits WHERE id = $1`, [
+      depositId,
+    ]);
     expect(row.needs_review).toBe(true);
     expect(row.anomaly).toContain('AMOUNT_MISMATCH');
   });
@@ -163,7 +192,10 @@ describe('deposits (real PostgreSQL, fake PSP with the simulator behaviours)', (
 
   it('returns 404 for unknown or malformed deposit ids', async () => {
     expect((await t.http.get('/deposits/00000000-0000-7000-8000-000000000000')).status).toBe(404);
-    expect((await t.http.get('/deposits/not-a-uuid')).body).toEqual({ code: 'NOT_FOUND', message: 'deposit not found' });
+    expect((await t.http.get('/deposits/not-a-uuid')).body).toEqual({
+      code: 'NOT_FOUND',
+      message: 'deposit not found',
+    });
   });
 
   it('keeps the ledger consistent', async () => {

@@ -13,7 +13,9 @@ export function assertValidJournal(draft: JournalDraft): void {
   for (const line of draft.lines) {
     if (line.amount <= 0n) throw new Error(`journal line amounts must be positive (got ${line.amount})`);
     if (isUserKind(line.account.kind) !== Boolean(line.account.userId)) {
-      throw new Error(`account ${line.account.kind} ${line.account.userId ? 'cannot' : 'must'} have a userId`);
+      throw new Error(
+        `account ${line.account.kind} ${line.account.userId ? 'cannot' : 'must'} have a userId`,
+      );
     }
     const key = `${line.account.userId ?? '*'}|${line.account.currency}|${line.account.kind}`;
     if (seen.has(key)) throw new Error(`account ${key} appears twice in one journal`);

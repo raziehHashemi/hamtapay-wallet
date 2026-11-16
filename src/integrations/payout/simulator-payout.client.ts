@@ -49,7 +49,11 @@ export class SimulatorPayoutClient extends PayoutGateway {
     if (res.status === 404 && method === 'GET') return { kind: 'NOT_FOUND' };
     // Only validation errors are definitive "not created". 408/409/429/5xx and anything else stay UNKNOWN.
     if ((res.status === 400 || res.status === 422) && method === 'POST') {
-      return { kind: 'REJECTED', httpStatus: res.status, error: String(json.error ?? res.text.slice(0, 100)) };
+      return {
+        kind: 'REJECTED',
+        httpStatus: res.status,
+        error: String(json.error ?? res.text.slice(0, 100)),
+      };
     }
     return { kind: 'UNKNOWN', reason: `HTTP ${res.status}: ${res.text.slice(0, 100)}` };
   }

@@ -89,14 +89,21 @@ export class ReconciliationService {
       `INSERT INTO reconciliation_reports (settlement_date, mismatch_count, report) VALUES ($1, $2, $3)`,
       [date, result.mismatches.length, JSON.stringify(report)],
     );
-    this.logger.log(`reconciliation ${date}: ${result.matched} matched, ${result.mismatches.length} mismatches`);
+    this.logger.log(
+      `reconciliation ${date}: ${result.matched} matched, ${result.mismatches.length} mismatches`,
+    );
     return report;
   }
 
   /** Our transactions whose value date (Asia/Tehran) is `date`, as signed Rial amounts. */
   private async loadDayRecords(date: string): Promise<LedgerRecord[]> {
     const tz = this.config.rules.limitTimezone;
-    const rows = await queryRows<{ kind: LedgerRecord['kind']; reference: string; amount_rial: string; id: string }>(
+    const rows = await queryRows<{
+      kind: LedgerRecord['kind'];
+      reference: string;
+      amount_rial: string;
+      id: string;
+    }>(
       this.dataSource.manager,
       `SELECT 'DEPOSIT' AS kind, psp_ref_id AS reference, verified_amount_rial AS amount_rial, id::text
          FROM deposits
@@ -113,13 +120,23 @@ export class ReconciliationService {
           AND (provider_returned_at AT TIME ZONE $2)::date = $1::date`,
       [date, tz],
     );
-    return rows.map((r) => ({ kind: r.kind, reference: r.reference, amountRial: BigInt(r.amount_rial), id: r.id }));
+    return rows.map((r) => ({
+      kind: r.kind,
+      reference: r.reference,
+      amountRial: BigInt(r.amount_rial),
+      id: r.id,
+    }));
   }
 
   /** Our records carrying any of these references, whatever their value date. */
   private async loadRecordsByReference(references: string[]): Promise<LedgerRecord[]> {
     if (!references.length) return [];
-    const rows = await queryRows<{ kind: LedgerRecord['kind']; reference: string; amount_rial: string; id: string }>(
+    const rows = await queryRows<{
+      kind: LedgerRecord['kind'];
+      reference: string;
+      amount_rial: string;
+      id: string;
+    }>(
       this.dataSource.manager,
       `SELECT 'DEPOSIT' AS kind, psp_ref_id AS reference, verified_amount_rial AS amount_rial, id::text
          FROM deposits WHERE status = 'SUCCEEDED' AND psp_ref_id = ANY($1::text[])
@@ -131,7 +148,12 @@ export class ReconciliationService {
          FROM withdrawals WHERE currency = 'IRT' AND return_journal_id IS NOT NULL AND provider_tracking_id = ANY($1::text[])`,
       [references],
     );
-    return rows.map((r) => ({ kind: r.kind, reference: r.reference, amountRial: BigInt(r.amount_rial), id: r.id }));
+    return rows.map((r) => ({
+      kind: r.kind,
+      reference: r.reference,
+      amountRial: BigInt(r.amount_rial),
+      id: r.id,
+    }));
   }
 
   private async loadWithdrawalRefs(references: string[]): Promise<Set<string>> {

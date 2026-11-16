@@ -49,12 +49,19 @@ export function decideOnVerify(expectedToman: bigint, outcome: VerifyOutcome): V
     case 'VERIFIED': {
       const creditToman = outcome.amountRial / RIAL_PER_TOMAN; // floor: never more than paid
       const expectedRial = expectedToman * RIAL_PER_TOMAN;
-      if (creditToman <= 0n) return { action: 'RETRY', reason: `verified amount ${outcome.amountRial} is not creditable` };
+      if (creditToman <= 0n)
+        return { action: 'RETRY', reason: `verified amount ${outcome.amountRial} is not creditable` };
       const anomaly =
         outcome.amountRial === expectedRial
           ? null
           : `AMOUNT_MISMATCH: requested ${expectedRial} IRR, verified ${outcome.amountRial} IRR`;
-      return { action: 'CREDIT', creditToman, refId: outcome.refId, verifiedRial: outcome.amountRial, anomaly };
+      return {
+        action: 'CREDIT',
+        creditToman,
+        refId: outcome.refId,
+        verifiedRial: outcome.amountRial,
+        anomaly,
+      };
     }
     case 'EXPIRED':
       return { action: 'FAIL', reason: 'PAYMENT_REVERSED' };
@@ -83,5 +90,9 @@ export function nextDepositCheckDelayMs(
 ): number | null {
   if (state.verifying) return VERIFY_RETRY_MS; // the PSP reverses unverified payments after 10 minutes
   if (state.ageMs >= config.depositStopPollingAfterMs) return null;
-  return exponentialBackoffMs(Math.max(0, state.attempts - 1), config.depositFirstCheckMs, config.depositPollCapMs);
+  return exponentialBackoffMs(
+    Math.max(0, state.attempts - 1),
+    config.depositFirstCheckMs,
+    config.depositPollCapMs,
+  );
 }

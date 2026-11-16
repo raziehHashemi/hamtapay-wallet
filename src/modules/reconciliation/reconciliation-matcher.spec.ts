@@ -1,7 +1,12 @@
 import { LedgerRecord, matchSettlement } from './reconciliation-matcher';
 import { SettlementRow } from './settlement-parser';
 
-const row = (rowNumber: number, kind: SettlementRow['kind'], reference: string, amountRial: bigint): SettlementRow => ({
+const row = (
+  rowNumber: number,
+  kind: SettlementRow['kind'],
+  reference: string,
+  amountRial: bigint,
+): SettlementRow => ({
   rowNumber,
   date: '1405/08/25',
   reference,
@@ -20,7 +25,11 @@ const rec = (kind: LedgerRecord['kind'], reference: string, amountRial: bigint, 
 describe('matchSettlement', () => {
   it('matches identical records and books Paya fees of known transfers as expected costs', () => {
     const result = matchSettlement(
-      [row(1, 'DEPOSIT', '111', 1_000_000n), row(2, 'WITHDRAWAL', 'TRKa', -5_000_000n), row(3, 'BANK_FEE', 'TRKa', -2500n)],
+      [
+        row(1, 'DEPOSIT', '111', 1_000_000n),
+        row(2, 'WITHDRAWAL', 'TRKa', -5_000_000n),
+        row(3, 'BANK_FEE', 'TRKa', -2500n),
+      ],
       [rec('DEPOSIT', '111', 1_000_000n), rec('WITHDRAWAL', 'TRKa', -5_000_000n)],
       [],
       new Set(['TRKa']),
@@ -38,7 +47,11 @@ describe('matchSettlement', () => {
         row(5, 'WITHDRAWAL_RETURN', 'TRKb', 7_000_000n),
         row(6, 'WITHDRAWAL_RETURN', 'TRKb', 7_000_000n), // same ref twice under different row numbers
       ],
-      [rec('DEPOSIT', '111', 900_000n, 'dep-1'), rec('WITHDRAWAL', 'TRKmissing', -1n, 'wd-1'), rec('WITHDRAWAL_RETURN', 'TRKb', 7_000_000n)],
+      [
+        rec('DEPOSIT', '111', 900_000n, 'dep-1'),
+        rec('WITHDRAWAL', 'TRKmissing', -1n, 'wd-1'),
+        rec('WITHDRAWAL_RETURN', 'TRKb', 7_000_000n),
+      ],
       [],
       new Set(),
     );
@@ -54,17 +67,32 @@ describe('matchSettlement', () => {
       ].sort(),
     );
     const amount = result.mismatches.find((m) => m.type === 'AMOUNT_MISMATCH')!;
-    expect(amount).toMatchObject({ settlementAmount: '1000000', ledgerAmount: '900000', ledgerId: 'dep-1', currency: 'IRR' });
+    expect(amount).toMatchObject({
+      settlementAmount: '1000000',
+      ledgerAmount: '900000',
+      ledgerId: 'dep-1',
+      currency: 'IRR',
+    });
     expect(result.matched).toBe(1);
   });
 
   it('does not report records booked on the neighbouring day (midnight clock skew) as missing', () => {
-    const result = matchSettlement([row(1, 'DEPOSIT', '111', 100n)], [], [rec('DEPOSIT', '111', 100n)], new Set());
+    const result = matchSettlement(
+      [row(1, 'DEPOSIT', '111', 100n)],
+      [],
+      [rec('DEPOSIT', '111', 100n)],
+      new Set(),
+    );
     expect(result).toMatchObject({ matched: 0, matchedOnOtherDay: 1, mismatches: [] });
   });
 
   it('matches padded references against stored ones', () => {
-    const result = matchSettlement([row(1, 'DEPOSIT', '0006122297631', 100n)], [rec('DEPOSIT', '6122297631', 100n)], [], new Set());
+    const result = matchSettlement(
+      [row(1, 'DEPOSIT', '0006122297631', 100n)],
+      [rec('DEPOSIT', '6122297631', 100n)],
+      [],
+      new Set(),
+    );
     expect(result.mismatches).toEqual([]);
   });
 });

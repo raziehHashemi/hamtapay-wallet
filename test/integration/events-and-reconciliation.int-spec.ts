@@ -3,7 +3,16 @@ import { NotificationProjector } from '../../src/modules/notifications/notificat
 import { EventPublisher } from '../../src/modules/outbox/event-publisher';
 import { OutboxRelayWorker } from '../../src/modules/outbox/outbox-relay.worker';
 import type { EventEnvelope } from '../../src/modules/outbox/outbox.service';
-import { createTestApp, fund, key, payoutWebhook, runDispatcher, TestApp, uniqueUser, withdraw } from '../support/test-app';
+import {
+  createTestApp,
+  fund,
+  key,
+  payoutWebhook,
+  runDispatcher,
+  TestApp,
+  uniqueUser,
+  withdraw,
+} from '../support/test-app';
 
 class RecordingPublisher extends EventPublisher {
   readonly name = 'recording';
@@ -48,7 +57,9 @@ describe('events: transactional outbox -> broker -> idempotent consumer (real Po
     }
     const types = publisher.published.filter((e) => e.aggregateId === userId).map((e) => e.type);
     expect(types).toContain('wallet.balance_changed');
-    const [left] = await t.dataSource.query(`SELECT count(*)::int AS n FROM outbox_events WHERE published_at IS NULL`);
+    const [left] = await t.dataSource.query(
+      `SELECT count(*)::int AS n FROM outbox_events WHERE published_at IS NULL`,
+    );
     expect(left.n).toBe(0);
   });
 
@@ -59,8 +70,16 @@ describe('events: transactional outbox -> broker -> idempotent consumer (real Po
     while (await relay.runOnce()) {
       /* drain */
     }
-    const last = publisher.published.filter((e) => e.type === 'wallet.balance_changed' && e.aggregateId === userId).at(-1)!;
-    expect(last.data).toMatchObject({ userId, currency: 'IRT', available: '1500000', held: '500000', journalType: 'WITHDRAWAL_HOLD' });
+    const last = publisher.published
+      .filter((e) => e.type === 'wallet.balance_changed' && e.aggregateId === userId)
+      .at(-1)!;
+    expect(last.data).toMatchObject({
+      userId,
+      currency: 'IRT',
+      available: '1500000',
+      held: '500000',
+      journalType: 'WITHDRAWAL_HOLD',
+    });
   });
 
   it('the consumer applies a re-delivered event only once', async () => {
@@ -69,9 +88,10 @@ describe('events: transactional outbox -> broker -> idempotent consumer (real Po
     expect(await projector.handle(event)).toBe('applied');
     expect(await projector.handle(event)).toBe('duplicate');
     expect(await projector.handle({ ...event })).toBe('duplicate');
-    const [{ n }] = await t.dataSource.query(`SELECT count(*)::int AS n FROM user_notifications WHERE event_id = $1`, [
-      event.eventId,
-    ]);
+    const [{ n }] = await t.dataSource.query(
+      `SELECT count(*)::int AS n FROM user_notifications WHERE event_id = $1`,
+      [event.eventId],
+    );
     expect(n).toBe(1);
   });
 });
@@ -85,7 +105,11 @@ describe('reconciliation against the PSP settlement report (real PostgreSQL)', (
     // one real deposit (matched), one deposit the PSP settled differently, one IBAN withdrawal + fee
     const userId = uniqueUser();
     const deposit = async (amount: string) => {
-      const res = await t.http.post('/deposits').set('Idempotency-Key', key()).send({ userId, amount }).expect(201);
+      const res = await t.http
+        .post('/deposits')
+        .set('Idempotency-Key', key())
+        .send({ userId, amount })
+        .expect(201);
       const token = t.psp.tokenFromUrl(res.body.paymentUrl);
       t.psp.pay(token);
       await t.http.post('/webhooks/psp/callback').send({ token, status: 'OK' }).expect(200);
@@ -97,10 +121,15 @@ describe('reconciliation against the PSP settlement report (real PostgreSQL)', (
     const wid = (await withdraw(t, userId, '1000000').expect(201)).body.withdrawalId;
     await runDispatcher(t);
     await payoutWebhook(t, { requestId: wid, status: 'SUCCEEDED' }).expect(200);
-    const [{ provider_tracking_id: trk }] = await t.dataSource.query(`SELECT provider_tracking_id FROM withdrawals WHERE id = $1`, [wid]);
+    const [{ provider_tracking_id: trk }] = await t.dataSource.query(
+      `SELECT provider_tracking_id FROM withdrawals WHERE id = $1`,
+      [wid],
+    );
     const ourOnly = await deposit('100000'); // the PSP "forgot" this one
 
-    const [{ today }] = await t.dataSource.query(`SELECT to_char((now() AT TIME ZONE 'Asia/Tehran')::date, 'YYYY-MM-DD') AS today`);
+    const [{ today }] = await t.dataSource.query(
+      `SELECT to_char((now() AT TIME ZONE 'Asia/Tehran')::date, 'YYYY-MM-DD') AS today`,
+    );
     const balanceBefore = await t.http.get(`/wallets/${userId}`);
     t.psp.settlementCsv =
       '﻿ردیف,تاریخ,شماره پیگیری,نوع تراکنش,مبلغ (ریال),شرح\r\n' +
@@ -119,8 +148,12 @@ describe('reconciliation against the PSP settlement report (real PostgreSQL)', (
       bankFeeRows: 1,
       bankFeesRial: '-2500',
     });
-    const mismatches = res.body.mismatches.map((m: { type: string; reference: string }) => `${m.type}:${m.reference}`).sort();
-    expect(mismatches).toEqual([`AMOUNT_MISMATCH:${refB}`, `MISSING_IN_LEDGER:7777777777`, `MISSING_IN_SETTLEMENT:${ourOnly}`].sort());
+    const mismatches = res.body.mismatches
+      .map((m: { type: string; reference: string }) => `${m.type}:${m.reference}`)
+      .sort();
+    expect(mismatches).toEqual(
+      [`AMOUNT_MISMATCH:${refB}`, `MISSING_IN_LEDGER:7777777777`, `MISSING_IN_SETTLEMENT:${ourOnly}`].sort(),
+    );
     expect(res.body.mismatches.find((m: { type: string }) => m.type === 'AMOUNT_MISMATCH')).toMatchObject({
       settlementAmount: '3100000',
       ledgerAmount: '3000000',

@@ -10,7 +10,8 @@ export enum DepositStatus {
   FAILED = 'FAILED',
 }
 
-export const isFinalDepositStatus = (s: DepositStatus) => s === DepositStatus.SUCCEEDED || s === DepositStatus.FAILED;
+export const isFinalDepositStatus = (s: DepositStatus) =>
+  s === DepositStatus.SUCCEEDED || s === DepositStatus.FAILED;
 
 @Entity({ name: 'deposits' })
 export class DepositEntity {

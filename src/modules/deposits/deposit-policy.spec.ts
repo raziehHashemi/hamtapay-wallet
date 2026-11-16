@@ -21,13 +21,29 @@ describe('deposit policy', () => {
   describe('decideOnVerify', () => {
     it('credits the verified amount converted from Rial to Toman', () => {
       expect(
-        decideOnVerify(500_000n, { kind: 'VERIFIED', amountRial: 5_000_000n, refId: '123', alreadyVerified: false }),
-      ).toEqual({ action: 'CREDIT', creditToman: 500_000n, refId: '123', verifiedRial: 5_000_000n, anomaly: null });
+        decideOnVerify(500_000n, {
+          kind: 'VERIFIED',
+          amountRial: 5_000_000n,
+          refId: '123',
+          alreadyVerified: false,
+        }),
+      ).toEqual({
+        action: 'CREDIT',
+        creditToman: 500_000n,
+        refId: '123',
+        verifiedRial: 5_000_000n,
+        anomaly: null,
+      });
     });
 
     it('treats ALREADY_VERIFIED (code 101) as success: crash between verify and credit is recoverable', () => {
       expect(
-        decideOnVerify(500_000n, { kind: 'VERIFIED', amountRial: 5_000_000n, refId: '1', alreadyVerified: true }).action,
+        decideOnVerify(500_000n, {
+          kind: 'VERIFIED',
+          amountRial: 5_000_000n,
+          refId: '1',
+          alreadyVerified: true,
+        }).action,
       ).toBe('CREDIT');
     });
 
@@ -59,10 +75,16 @@ describe('deposit policy', () => {
   });
 
   describe('nextDepositCheckDelayMs', () => {
-    const config = { depositFirstCheckMs: 5000, depositPollCapMs: 30000, depositStopPollingAfterMs: 86_400_000 };
+    const config = {
+      depositFirstCheckMs: 5000,
+      depositPollCapMs: 30000,
+      depositStopPollingAfterMs: 86_400_000,
+    };
 
     it('retries verification quickly (PSP reverses unverified payments after 10 minutes)', () => {
-      expect(nextDepositCheckDelayMs({ verifying: true, attempts: 50, ageMs: 0 }, config)).toBe(VERIFY_RETRY_MS);
+      expect(nextDepositCheckDelayMs({ verifying: true, attempts: 50, ageMs: 0 }, config)).toBe(
+        VERIFY_RETRY_MS,
+      );
     });
     it('backs off exponentially for unpaid deposits, capped', () => {
       const delays = [1, 2, 3, 4, 9].map((attempts) =>
@@ -71,7 +93,9 @@ describe('deposit policy', () => {
       expect(delays).toEqual([5000, 10000, 20000, 30000, 30000]);
     });
     it('stops polling abandoned deposits after a day (callbacks still work)', () => {
-      expect(nextDepositCheckDelayMs({ verifying: false, attempts: 1, ageMs: 86_400_000 }, config)).toBeNull();
+      expect(
+        nextDepositCheckDelayMs({ verifying: false, attempts: 1, ageMs: 86_400_000 }, config),
+      ).toBeNull();
     });
   });
 });

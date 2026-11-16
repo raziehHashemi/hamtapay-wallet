@@ -50,47 +50,64 @@ export class WithdrawalsService {
     await this.ledger.ensureUserAccounts(userId, currency);
 
     const request = { userId, currency, amount: amount.toString(), destination };
-    const result = await this.idempotency.execute({ scope: 'withdrawals.create', key, request }, async (manager) => {
-      const balance = await this.ledger.getUserBalance(manager, userId, currency);
-      if (balance.receivable > 0n) {
-        throw Errors.accountRestricted('withdrawals are suspended until the outstanding debt is settled');
-      }
-      const id = uuidv7();
-      const total = amount.minor + fee;
-      const hold = await this.ledger.post(manager, {
-        type: JournalType.WITHDRAWAL_HOLD,
-        idempotencyRef: `withdrawal:${id}:hold`,
-        referenceType: 'withdrawal',
-        referenceId: id,
-        description: `hold for withdrawal to ${destination}`,
-        lines: [
-          { account: userAccount(userId, currency, AccountKind.USER_AVAILABLE), direction: 'DEBIT', amount: total },
-          { account: userAccount(userId, currency, AccountKind.USER_HELD), direction: 'CREDIT', amount: total },
-        ],
-      });
-      const limitDay = await this.limits.consume(manager, userId, limitAmount);
-      await manager.getRepository(WithdrawalEntity).insert({
-        id,
-        userId,
-        currency,
-        amount: amount.minor,
-        fee,
-        destination,
-        status: WithdrawalStatus.PENDING,
-        limitDay,
-        limitAmountIrt: limitAmount,
-        usdtIrtRate: currency === Currency.USDT ? rate : null,
-        holdJournalId: hold.journalId,
-        nextAttemptAt: new Date(Date.now() + this.config.workers.withdrawalDispatchDelayMs),
-      });
-      await this.outbox.enqueue(manager, {
-        type: 'withdrawal.created',
-        aggregateType: 'withdrawal',
-        aggregateId: id,
-        payload: { withdrawalId: id, userId, currency, amount: amount.toString(), fee: formatMinor(currency, fee) },
-      });
-      return toWithdrawalResponse(await manager.getRepository(WithdrawalEntity).findOneByOrFail({ id }));
-    });
+    const result = await this.idempotency.execute(
+      { scope: 'withdrawals.create', key, request },
+      async (manager) => {
+        const balance = await this.ledger.getUserBalance(manager, userId, currency);
+        if (balance.receivable > 0n) {
+          throw Errors.accountRestricted('withdrawals are suspended until the outstanding debt is settled');
+        }
+        const id = uuidv7();
+        const total = amount.minor + fee;
+        const hold = await this.ledger.post(manager, {
+          type: JournalType.WITHDRAWAL_HOLD,
+          idempotencyRef: `withdrawal:${id}:hold`,
+          referenceType: 'withdrawal',
+          referenceId: id,
+          description: `hold for withdrawal to ${destination}`,
+          lines: [
+            {
+              account: userAccount(userId, currency, AccountKind.USER_AVAILABLE),
+              direction: 'DEBIT',
+              amount: total,
+            },
+            {
+              account: userAccount(userId, currency, AccountKind.USER_HELD),
+              direction: 'CREDIT',
+              amount: total,
+            },
+          ],
+        });
+        const limitDay = await this.limits.consume(manager, userId, limitAmount);
+        await manager.getRepository(WithdrawalEntity).insert({
+          id,
+          userId,
+          currency,
+          amount: amount.minor,
+          fee,
+          destination,
+          status: WithdrawalStatus.PENDING,
+          limitDay,
+          limitAmountIrt: limitAmount,
+          usdtIrtRate: currency === Currency.USDT ? rate : null,
+          holdJournalId: hold.journalId,
+          nextAttemptAt: new Date(Date.now() + this.config.workers.withdrawalDispatchDelayMs),
+        });
+        await this.outbox.enqueue(manager, {
+          type: 'withdrawal.created',
+          aggregateType: 'withdrawal',
+          aggregateId: id,
+          payload: {
+            withdrawalId: id,
+            userId,
+            currency,
+            amount: amount.toString(),
+            fee: formatMinor(currency, fee),
+          },
+        });
+        return toWithdrawalResponse(await manager.getRepository(WithdrawalEntity).findOneByOrFail({ id }));
+      },
+    );
     if (!result.replayed) this.dispatcher.nudge();
     return result;
   }

@@ -13,7 +13,9 @@ export class CreateReconciliationReports1794830460000 implements MigrationInterf
         report           JSONB NOT NULL,
         created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
       )`);
-    await q.query(`CREATE INDEX reconciliation_reports_date_idx ON reconciliation_reports (settlement_date, id DESC)`);
+    await q.query(
+      `CREATE INDEX reconciliation_reports_date_idx ON reconciliation_reports (settlement_date, id DESC)`,
+    );
   }
 
   async down(q: QueryRunner): Promise<void> {

@@ -50,7 +50,9 @@ export class FakePaymentGateway extends PaymentGateway {
     this.calls.inquire++;
     if (this.inquiryFails) throw new PaymentGatewayUnavailableError('inquiry down');
     const p = this.payments.get(token);
-    return p ? { token, orderId: p.orderId, status: p.status, amountRial: p.amountRial, refId: p.refId } : null;
+    return p
+      ? { token, orderId: p.orderId, status: p.status, amountRial: p.amountRial, refId: p.refId }
+      : null;
   }
 
   async verify(token: string): Promise<VerifyOutcome> {
@@ -59,7 +61,8 @@ export class FakePaymentGateway extends PaymentGateway {
     if (!p) return { kind: 'UNKNOWN_TOKEN' };
     if (this.verify503Once.delete(token)) return { kind: 'UNAVAILABLE', reason: 'verify returned HTTP 503' };
     const amountRial = p.verifyAmountOverride ?? p.amountRial;
-    if (p.status === 'VERIFIED') return { kind: 'VERIFIED', amountRial, refId: p.refId!, alreadyVerified: true };
+    if (p.status === 'VERIFIED')
+      return { kind: 'VERIFIED', amountRial, refId: p.refId!, alreadyVerified: true };
     if (p.status === 'PAID') {
       p.status = 'VERIFIED';
       return { kind: 'VERIFIED', amountRial, refId: p.refId!, alreadyVerified: false };

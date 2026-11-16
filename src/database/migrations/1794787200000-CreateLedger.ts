@@ -44,7 +44,9 @@ export class CreateLedger1794787200000 implements MigrationInterface {
         created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
         CONSTRAINT ledger_journals_idempotency_ref_uq UNIQUE (idempotency_ref)
       )`);
-    await q.query(`CREATE INDEX ledger_journals_reference_idx ON ledger_journals (reference_type, reference_id)`);
+    await q.query(
+      `CREATE INDEX ledger_journals_reference_idx ON ledger_journals (reference_type, reference_id)`,
+    );
 
     await q.query(`
       CREATE TABLE ledger_entries (

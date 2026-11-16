@@ -17,7 +17,8 @@ export function normalizeDestination(currency: Currency, destination: unknown): 
     if (!iban) throw Errors.invalidDestination('destination must be a valid Iranian IBAN (IR + 24 digits)');
     return iban;
   }
-  if (!isValidTrc20Address(destination)) throw Errors.invalidDestination('destination must be a TRC20 address');
+  if (!isValidTrc20Address(destination))
+    throw Errors.invalidDestination('destination must be a TRC20 address');
   return destination;
 }
 

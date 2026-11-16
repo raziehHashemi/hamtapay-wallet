@@ -31,7 +31,9 @@ export class PayoutWebhookService {
 
     if (!signatureOk) {
       await this.audit(eventId, requestId, false, body, 'rejected: bad signature');
-      this.logger.warn(`rejected payout webhook with invalid signature (requestId=${requestId}, status=${String(body.status)})`);
+      this.logger.warn(
+        `rejected payout webhook with invalid signature (requestId=${requestId}, status=${String(body.status)})`,
+      );
       throw Errors.invalidSignature();
     }
     if (!requestId || !isProviderStatus(body.status)) {
@@ -39,7 +41,8 @@ export class PayoutWebhookService {
       throw Errors.validation('webhook must carry requestId and a known status');
     }
     const exists =
-      isUuid(requestId) && (await this.dataSource.getRepository(WithdrawalEntity).existsBy({ id: requestId }));
+      isUuid(requestId) &&
+      (await this.dataSource.getRepository(WithdrawalEntity).existsBy({ id: requestId }));
     if (!exists) {
       await this.audit(eventId, requestId, true, body, 'ignored: unknown requestId');
       return { received: true, applied: 'UNKNOWN_REQUEST' };

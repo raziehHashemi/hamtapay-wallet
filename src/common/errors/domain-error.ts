@@ -68,9 +68,19 @@ export const Errors = {
   alreadyReversed: () =>
     new DomainError(ErrorCode.ALREADY_REVERSED, 'this adjustment was already reversed', HttpStatus.CONFLICT),
   invalidSignature: () =>
-    new DomainError(ErrorCode.INVALID_SIGNATURE, 'webhook signature is invalid', HttpStatus.UNAUTHORIZED, false),
+    new DomainError(
+      ErrorCode.INVALID_SIGNATURE,
+      'webhook signature is invalid',
+      HttpStatus.UNAUTHORIZED,
+      false,
+    ),
   unauthorized: () =>
-    new DomainError(ErrorCode.UNAUTHORIZED, 'missing or invalid internal API key', HttpStatus.UNAUTHORIZED, false),
+    new DomainError(
+      ErrorCode.UNAUTHORIZED,
+      'missing or invalid internal API key',
+      HttpStatus.UNAUTHORIZED,
+      false,
+    ),
   gatewayUnavailable: (message = 'payment gateway is temporarily unavailable, retry with the same key') =>
     new DomainError(ErrorCode.GATEWAY_UNAVAILABLE, message, HttpStatus.BAD_GATEWAY, false),
 };

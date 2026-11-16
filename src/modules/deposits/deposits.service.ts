@@ -89,13 +89,19 @@ export class DepositsService {
   }
 
   /** PSP callback: an unauthenticated *hint* that something changed. We look the truth up ourselves. */
-  async handleCallback(payload: Record<string, unknown>): Promise<{ received: true; status?: DepositStatus }> {
+  async handleCallback(
+    payload: Record<string, unknown>,
+  ): Promise<{ received: true; status?: DepositStatus }> {
     const token = typeof payload.token === 'string' ? payload.token : null;
     const deposit = token
       ? await this.dataSource.getRepository(DepositEntity).findOneBy({ pspToken: token })
       : null;
     const orderMismatch = deposit && payload.orderId !== undefined && payload.orderId !== deposit.id;
-    await this.recordInbound(token, payload, deposit ? (orderMismatch ? 'order-id-mismatch' : 'accepted') : 'unknown-token');
+    await this.recordInbound(
+      token,
+      payload,
+      deposit ? (orderMismatch ? 'order-id-mismatch' : 'accepted') : 'unknown-token',
+    );
     if (!deposit) return { received: true };
 
     try {
@@ -108,7 +114,11 @@ export class DepositsService {
     return { received: true, status: fresh?.status };
   }
 
-  private async recordInbound(token: string | null, payload: Record<string, unknown>, outcome: string): Promise<void> {
+  private async recordInbound(
+    token: string | null,
+    payload: Record<string, unknown>,
+    outcome: string,
+  ): Promise<void> {
     await queryRows(
       this.dataSource.manager,
       `INSERT INTO inbound_events (source, reference, payload, outcome) VALUES ('PSP_CALLBACK', $1, $2, $3)`,

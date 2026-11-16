@@ -30,7 +30,9 @@ export class CreateDepositsAndWithdrawals1794787320000 implements MigrationInter
           CHECK (status IN ('PENDING', 'VERIFYING') OR next_check_at IS NULL)
       )`);
     await q.query(`CREATE INDEX deposits_user_idx ON deposits (user_id, created_at DESC)`);
-    await q.query(`CREATE INDEX deposits_due_idx ON deposits (next_check_at) WHERE next_check_at IS NOT NULL`);
+    await q.query(
+      `CREATE INDEX deposits_due_idx ON deposits (next_check_at) WHERE next_check_at IS NOT NULL`,
+    );
     await q.query(`CREATE INDEX deposits_ref_idx ON deposits (psp_ref_id) WHERE psp_ref_id IS NOT NULL`);
 
     await q.query(`
@@ -64,7 +66,9 @@ export class CreateDepositsAndWithdrawals1794787320000 implements MigrationInter
         updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
       )`);
     await q.query(`CREATE INDEX withdrawals_user_idx ON withdrawals (user_id, created_at DESC)`);
-    await q.query(`CREATE INDEX withdrawals_due_idx ON withdrawals (next_attempt_at) WHERE next_attempt_at IS NOT NULL`);
+    await q.query(
+      `CREATE INDEX withdrawals_due_idx ON withdrawals (next_attempt_at) WHERE next_attempt_at IS NOT NULL`,
+    );
     await q.query(`
       CREATE INDEX withdrawals_tracking_idx ON withdrawals (provider_tracking_id)
       WHERE provider_tracking_id IS NOT NULL`);

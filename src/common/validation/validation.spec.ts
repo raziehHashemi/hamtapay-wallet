@@ -51,7 +51,9 @@ describe('TRC20 address', () => {
 });
 
 describe('user id', () => {
-  it.each(['user-42', '42', 'a.b_c:d@e', 'x'.repeat(64)])('accepts %p', (id) => expect(isValidUserId(id)).toBe(true));
+  it.each(['user-42', '42', 'a.b_c:d@e', 'x'.repeat(64)])('accepts %p', (id) =>
+    expect(isValidUserId(id)).toBe(true),
+  );
   it.each(['', 'x'.repeat(65), 'has space', 'semi;colon', "quote'", 42])('rejects %p', (id) =>
     expect(isValidUserId(id)).toBe(false),
   );

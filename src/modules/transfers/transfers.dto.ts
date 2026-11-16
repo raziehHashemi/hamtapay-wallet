@@ -18,7 +18,10 @@ export class CreateTransferDto {
 
 export class TransferResponseDto {
   @ApiProperty() transferId: string;
-  @ApiProperty({ example: 'SUCCEEDED', description: 'Transfers are atomic: they either fully happen or not at all' })
+  @ApiProperty({
+    example: 'SUCCEEDED',
+    description: 'Transfers are atomic: they either fully happen or not at all',
+  })
   status: string;
   @ApiProperty() fromUserId: string;
   @ApiProperty() toUserId: string;

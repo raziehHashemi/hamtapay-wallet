@@ -37,7 +37,11 @@ export class AdjustmentsService {
         referenceId: id,
         description: dto.reason,
         lines: [
-          { account: systemAccount(dto.currency, AccountKind.OPS_ADJUSTMENTS), direction: 'DEBIT', amount: amount.minor },
+          {
+            account: systemAccount(dto.currency, AccountKind.OPS_ADJUSTMENTS),
+            direction: 'DEBIT',
+            amount: amount.minor,
+          },
           {
             account: userAccount(dto.userId, dto.currency, AccountKind.USER_AVAILABLE),
             direction: 'CREDIT',
@@ -61,13 +65,23 @@ export class AdjustmentsService {
         type: 'adjustment.created',
         aggregateType: 'adjustment',
         aggregateId: id,
-        payload: { adjustmentId: id, userId: dto.userId, currency: dto.currency, amount: amount.toString(), reason: dto.reason },
+        payload: {
+          adjustmentId: id,
+          userId: dto.userId,
+          currency: dto.currency,
+          amount: amount.toString(),
+          reason: dto.reason,
+        },
       });
       return this.toResponse(await this.reload(manager, entity.id));
     });
   }
 
-  async reverse(id: string, dto: ReverseAdjustmentDto, key: string): Promise<IdempotentResult<AdjustmentResponseDto>> {
+  async reverse(
+    id: string,
+    dto: ReverseAdjustmentDto,
+    key: string,
+  ): Promise<IdempotentResult<AdjustmentResponseDto>> {
     return this.idempotency.execute(
       { scope: 'adjustments.reverse', key, request: { id, ...dto } },
       async (manager) => {

@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { Client } from 'pg';
 import { runMigrations } from '../../src/database/migrate';
@@ -16,7 +15,8 @@ export default async function globalSetup(): Promise<void> {
   let url = process.env.TEST_DATABASE_URL;
   if (url) {
     const dbName = new URL(url).pathname.slice(1);
-    if (!dbName.includes('test')) throw new Error(`refusing to wipe "${dbName}": TEST_DATABASE_URL must point to a *test* database`);
+    if (!dbName.includes('test'))
+      throw new Error(`refusing to wipe "${dbName}": TEST_DATABASE_URL must point to a *test* database`);
     const client = new Client({ connectionString: url });
     await client.connect();
     await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
@@ -26,7 +26,15 @@ export default async function globalSetup(): Promise<void> {
       .withDatabase('wallet_test')
       .withUsername('test')
       .withPassword('test')
-      .withCommand(['postgres', '-c', 'max_connections=300', '-c', 'fsync=off', '-c', 'synchronous_commit=off'])
+      .withCommand([
+        'postgres',
+        '-c',
+        'max_connections=300',
+        '-c',
+        'fsync=off',
+        '-c',
+        'synchronous_commit=off',
+      ])
       .start();
     globalThis.__PG_CONTAINER__ = container;
     url = container.getConnectionUri();

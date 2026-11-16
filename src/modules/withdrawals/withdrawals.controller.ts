@@ -102,7 +102,9 @@ export class WithdrawalsController {
   @UseGuards(InternalApiKeyGuard)
   @ApiTags('Operations (internal)')
   @ApiSecurity('internal-api-key')
-  @ApiOperation({ summary: 'Withdrawals flagged for a human (no final answer for too long, late success, ...)' })
+  @ApiOperation({
+    summary: 'Withdrawals flagged for a human (no final answer for too long, late success, ...)',
+  })
   reviewQueue() {
     return this.withdrawals.reviewQueue();
   }

@@ -8,7 +8,14 @@ export interface IntegrityReport {
   ok: boolean;
   checkedAt: string;
   unbalancedJournals: { journalId: string; currency: string; difference: string }[];
-  balanceDrift: { accountId: string; userId: string; currency: string; kind: string; stored: string; ledger: string }[];
+  balanceDrift: {
+    accountId: string;
+    userId: string;
+    currency: string;
+    kind: string;
+    stored: string;
+    ledger: string;
+  }[];
   negativeBalances: number;
   trialBalance: { currency: string; debits: string; credits: string }[];
   systemAccounts: { currency: string; kind: string; balance: string }[];
@@ -94,7 +101,11 @@ export class LedgerIntegrityService {
         debits: fmt(t.currency, t.debits),
         credits: fmt(t.currency, t.credits),
       })),
-      systemAccounts: system.map((s) => ({ currency: s.currency, kind: s.kind, balance: fmt(s.currency, s.balance) })),
+      systemAccounts: system.map((s) => ({
+        currency: s.currency,
+        kind: s.kind,
+        balance: fmt(s.currency, s.balance),
+      })),
     };
   }
 }

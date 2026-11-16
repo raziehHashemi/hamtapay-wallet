@@ -31,7 +31,9 @@ export class CreateIdempotencyAndOutbox1794787260000 implements MigrationInterfa
         attempts       INT NOT NULL DEFAULT 0,
         last_error     TEXT
       )`);
-    await q.query(`CREATE INDEX outbox_events_unpublished_idx ON outbox_events (id) WHERE published_at IS NULL`);
+    await q.query(
+      `CREATE INDEX outbox_events_unpublished_idx ON outbox_events (id) WHERE published_at IS NULL`,
+    );
 
     // Consumer-side inbox: (consumer, event_id) makes re-delivered events a no-op.
     await q.query(`

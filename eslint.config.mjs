@@ -22,4 +22,9 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // black-box test clients deal with untyped JSON from HTTP responses
+    files: ['test/**/*.ts'],
+    rules: { '@typescript-eslint/no-explicit-any': 'off' },
+  },
 );

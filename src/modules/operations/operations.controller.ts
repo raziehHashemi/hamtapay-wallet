@@ -62,7 +62,8 @@ export class OperationsController {
   @Get('ledger/integrity')
   @ApiOperation({
     summary: 'Re-derive ledger invariants from raw entries',
-    description: 'Balanced journals, stored balance == Σ entries for every user account, no negative balance.',
+    description:
+      'Balanced journals, stored balance == Σ entries for every user account, no negative balance.',
   })
   @ApiOkResponse({ description: 'Integrity report' })
   checkIntegrity(): Promise<IntegrityReport> {

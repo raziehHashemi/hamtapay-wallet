@@ -66,7 +66,13 @@ export class DepositReconciler {
     const verdict = decideOnVerify(deposit.amount, outcome);
     switch (verdict.action) {
       case 'CREDIT':
-        await this.credit(depositId, verdict.creditToman, verdict.refId, verdict.verifiedRial, verdict.anomaly);
+        await this.credit(
+          depositId,
+          verdict.creditToman,
+          verdict.refId,
+          verdict.verifiedRial,
+          verdict.anomaly,
+        );
         return;
       case 'FAIL':
         await this.fail(depositId, verdict.reason, 'REVERSED');
@@ -89,8 +95,14 @@ export class DepositReconciler {
       if (deposit.status === DepositStatus.SUCCEEDED) return; // a concurrent callback/poll got here first
       if (deposit.status === DepositStatus.FAILED) {
         // Cannot happen with this PSP (FAILED/REVERSED are terminal there) — but never silently drop money.
-        this.logger.error(`deposit ${depositId} is FAILED but the PSP verified a payment; flagged for review`);
-        await manager.update(DepositEntity, { id: depositId }, { needsReview: true, anomaly: 'VERIFIED_AFTER_FAILED' });
+        this.logger.error(
+          `deposit ${depositId} is FAILED but the PSP verified a payment; flagged for review`,
+        );
+        await manager.update(
+          DepositEntity,
+          { id: depositId },
+          { needsReview: true, anomaly: 'VERIFIED_AFTER_FAILED' },
+        );
         return;
       }
       const posted = await this.ledger.post(manager, {
@@ -100,7 +112,11 @@ export class DepositReconciler {
         referenceId: depositId,
         description: `PSP refId ${refId}`,
         lines: [
-          { account: systemAccount(Currency.IRT, AccountKind.PSP_CLEARING), direction: 'DEBIT', amount: creditToman },
+          {
+            account: systemAccount(Currency.IRT, AccountKind.PSP_CLEARING),
+            direction: 'DEBIT',
+            amount: creditToman,
+          },
           {
             account: userAccount(deposit.userId, Currency.IRT, AccountKind.USER_AVAILABLE),
             direction: 'CREDIT',
@@ -115,7 +131,15 @@ export class DepositReconciler {
                 credited_amount = $4, journal_id = $5, anomaly = $6, needs_review = $7,
                 verified_at = now(), finalized_at = now(), next_check_at = NULL, updated_at = now()
           WHERE id = $1`,
-        [depositId, refId, verifiedRial.toString(), creditToman.toString(), posted.journalId, anomaly, anomaly !== null],
+        [
+          depositId,
+          refId,
+          verifiedRial.toString(),
+          creditToman.toString(),
+          posted.journalId,
+          anomaly,
+          anomaly !== null,
+        ],
       );
       await this.outbox.enqueue(manager, {
         type: 'deposit.succeeded',

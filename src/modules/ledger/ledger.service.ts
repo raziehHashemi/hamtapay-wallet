@@ -159,7 +159,11 @@ export class LedgerService {
     });
   }
 
-  async getUserBalance(manager: EntityManager, userId: string, currency: Currency): Promise<UserBalanceSnapshot> {
+  async getUserBalance(
+    manager: EntityManager,
+    userId: string,
+    currency: Currency,
+  ): Promise<UserBalanceSnapshot> {
     const rows = await queryRows<{ kind: AccountKind; balance: string }>(
       manager,
       `SELECT kind, balance FROM ledger_accounts WHERE owner_user_id = $1 AND currency = $2`,
@@ -169,7 +173,11 @@ export class LedgerService {
   }
 
   /** Same as getUserBalance but row-locks the user's accounts until the transaction ends. */
-  async lockUserBalance(manager: EntityManager, userId: string, currency: Currency): Promise<UserBalanceSnapshot> {
+  async lockUserBalance(
+    manager: EntityManager,
+    userId: string,
+    currency: Currency,
+  ): Promise<UserBalanceSnapshot> {
     const rows = await queryRows<{ kind: AccountKind; balance: string }>(
       manager,
       `SELECT kind, balance FROM ledger_accounts WHERE owner_user_id = $1 AND currency = $2 ORDER BY id FOR UPDATE`,
@@ -304,7 +312,10 @@ export class LedgerService {
     return this.systemAccounts;
   }
 
-  private async applyUserBalanceChanges(manager: EntityManager, lines: ResolvedLine[]): Promise<Map<string, bigint>> {
+  private async applyUserBalanceChanges(
+    manager: EntityManager,
+    lines: ResolvedLine[],
+  ): Promise<Map<string, bigint>> {
     const after = new Map<string, bigint>();
     const userLines = lines
       .filter((l) => isUserKind(l.account.kind))
@@ -322,7 +333,9 @@ export class LedgerService {
       );
       if (!row) {
         if (line.account.kind === AccountKind.USER_AVAILABLE) throw Errors.insufficientFunds();
-        throw new Error(`invariant violated: ${line.account.kind} of ${line.account.userId} would become negative`);
+        throw new Error(
+          `invariant violated: ${line.account.kind} of ${line.account.userId} would become negative`,
+        );
       }
       after.set(line.accountId, BigInt(row.balance));
     }

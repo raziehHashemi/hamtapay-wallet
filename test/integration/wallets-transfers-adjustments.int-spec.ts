@@ -1,5 +1,13 @@
 import { decodeCursor } from '../../src/common/util/cursor';
-import { createTestApp, expectLedgerIntact, fund, key, TestApp, uniqueUser, wallet } from '../support/test-app';
+import {
+  createTestApp,
+  expectLedgerIntact,
+  fund,
+  key,
+  TestApp,
+  uniqueUser,
+  wallet,
+} from '../support/test-app';
 
 describe('wallets, ledger history, transfers and adjustments (real PostgreSQL)', () => {
   let t: TestApp;
@@ -17,7 +25,10 @@ describe('wallets, ledger history, transfers and adjustments (real PostgreSQL)',
           { currency: 'USDT', available: '0', held: '0', total: '0', debt: '0' },
         ],
       });
-      const [{ n }] = await t.dataSource.query(`SELECT count(*)::int AS n FROM ledger_accounts WHERE owner_user_id = $1`, [userId]);
+      const [{ n }] = await t.dataSource.query(
+        `SELECT count(*)::int AS n FROM ledger_accounts WHERE owner_user_id = $1`,
+        [userId],
+      );
       expect(n).toBe(0);
     });
 
@@ -138,7 +149,11 @@ describe('wallets, ledger history, transfers and adjustments (real PostgreSQL)',
         .set('Idempotency-Key', key())
         .send({ fromUserId: from, toUserId: to, currency: 'IRT', amount: '400000' })
         .expect(201);
-      expect(res.body).toMatchObject({ transferId: expect.any(String), status: 'SUCCEEDED', amount: '400000' });
+      expect(res.body).toMatchObject({
+        transferId: expect.any(String),
+        status: 'SUCCEEDED',
+        amount: '400000',
+      });
       expect((await wallet(t, from)).available).toBe('600000');
       expect((await wallet(t, to)).available).toBe('400000');
     });
@@ -159,9 +174,10 @@ describe('wallets, ledger history, transfers and adjustments (real PostgreSQL)',
       const [from, to] = [uniqueUser(), uniqueUser()];
       await fund(t, from, '100');
       const post = (body: object) => t.http.post('/transfers').set('Idempotency-Key', key()).send(body);
-      expect((await post({ fromUserId: from, toUserId: to, currency: 'IRT', amount: '101' }).expect(422)).body.code).toBe(
-        'INSUFFICIENT_FUNDS',
-      );
+      expect(
+        (await post({ fromUserId: from, toUserId: to, currency: 'IRT', amount: '101' }).expect(422)).body
+          .code,
+      ).toBe('INSUFFICIENT_FUNDS');
       await post({ fromUserId: from, toUserId: from, currency: 'IRT', amount: '1' }).expect(400);
       await post({ fromUserId: from, toUserId: to, currency: 'IRT', amount: '0' }).expect(400);
       await post({ fromUserId: from, toUserId: to, currency: 'USDT', amount: '1.0000001' }).expect(400);
@@ -176,9 +192,19 @@ describe('wallets, ledger history, transfers and adjustments (real PostgreSQL)',
       const res = await t.http
         .post('/internal/adjustments')
         .set('Idempotency-Key', key())
-        .send({ userId, currency: 'IRT', amount: '75000', reason: 'compensation INC-7', operator: 'ops.sara' })
+        .send({
+          userId,
+          currency: 'IRT',
+          amount: '75000',
+          reason: 'compensation INC-7',
+          operator: 'ops.sara',
+        })
         .expect(201);
-      expect(res.body).toMatchObject({ adjustmentId: expect.any(String), amount: '75000', operator: 'ops.sara' });
+      expect(res.body).toMatchObject({
+        adjustmentId: expect.any(String),
+        amount: '75000',
+        operator: 'ops.sara',
+      });
       const lines = await t.dataSource.query(
         `SELECT a.kind, e.direction, e.amount FROM ledger_entries e JOIN ledger_accounts a ON a.id = e.account_id
           WHERE e.journal_id = $1 ORDER BY a.kind`,

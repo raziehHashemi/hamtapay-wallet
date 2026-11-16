@@ -22,7 +22,8 @@ export class ReconciliationController {
   @HttpCode(200)
   @ApiOperation({
     summary: 'Compare the PSP settlement report of a day with our transactions (report only, fixes nothing)',
-    description: 'No Idempotency-Key: the run has no side effect on balances (each run is stored as a report).',
+    description:
+      'No Idempotency-Key: the run has no side effect on balances (each run is stored as a report).',
   })
   @ApiOkResponse({ description: '{ date, summary, mismatches: [{ type, reference, ... }], warnings }' })
   run(@Body() dto: RunReconciliationDto): Promise<ReconciliationReport> {

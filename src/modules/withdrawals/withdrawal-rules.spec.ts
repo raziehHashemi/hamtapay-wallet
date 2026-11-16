@@ -7,7 +7,9 @@ import { signWebhook, verifyWebhookSignature } from './webhook-signature';
 describe('withdrawal rules', () => {
   describe('normalizeDestination', () => {
     it('normalises an IBAN for IRT', () => {
-      expect(normalizeDestination(Currency.IRT, 'ir82 0540 1026 8002 0817 9090 02')).toBe('IR820540102680020817909002');
+      expect(normalizeDestination(Currency.IRT, 'ir82 0540 1026 8002 0817 9090 02')).toBe(
+        'IR820540102680020817909002',
+      );
     });
 
     it.each<[Currency, unknown]>([
@@ -44,7 +46,12 @@ describe('withdrawal rules', () => {
   describe('toPayoutRequest', () => {
     it('sends IRT withdrawals as IBAN transfers in Rial (provider-notes §P1)', () => {
       expect(
-        toPayoutRequest({ id: 'w-1', currency: Currency.IRT, amount: 250_000n, destination: 'IR820540102680020817909002' }),
+        toPayoutRequest({
+          id: 'w-1',
+          currency: Currency.IRT,
+          amount: 250_000n,
+          destination: 'IR820540102680020817909002',
+        }),
       ).toEqual({
         requestId: 'w-1',
         type: 'IBAN',
@@ -77,7 +84,9 @@ describe('withdrawal rules', () => {
     it('rejects a forged signature, a modified body, a wrong secret or a missing header', () => {
       const signature = signWebhook(body, secret);
       expect(verifyWebhookSignature(Buffer.from(body), 'ab'.repeat(32), secret)).toBe(false);
-      expect(verifyWebhookSignature(Buffer.from(body.replace('SUCCEEDED', 'FAILED')), signature, secret)).toBe(false);
+      expect(
+        verifyWebhookSignature(Buffer.from(body.replace('SUCCEEDED', 'FAILED')), signature, secret),
+      ).toBe(false);
       expect(verifyWebhookSignature(Buffer.from(body), signature, 'other')).toBe(false);
       expect(verifyWebhookSignature(Buffer.from(body), undefined, secret)).toBe(false);
       expect(verifyWebhookSignature(undefined, signature, secret)).toBe(false);

@@ -66,8 +66,15 @@ describe('settlement CSV parser', () => {
 
     it('normalises padded references and Jalali dates', () => {
       const first = parsed.rows[0];
-      expect(first).toMatchObject({ rowNumber: 1, reference: '6122297631', date: '1405/08/25', amountRial: 1_000_000n });
-      expect(parsed.rows.some((r) => r.reference.startsWith('0') || r.reference !== r.reference.trim())).toBe(false);
+      expect(first).toMatchObject({
+        rowNumber: 1,
+        reference: '6122297631',
+        date: '1405/08/25',
+        amountRial: 1_000_000n,
+      });
+      expect(parsed.rows.some((r) => r.reference.startsWith('0') || r.reference !== r.reference.trim())).toBe(
+        false,
+      );
     });
 
     it('produces no warnings for a well-formed file', () => {
@@ -76,7 +83,8 @@ describe('settlement CSV parser', () => {
   });
 
   it('warns about a row number reused with different content', () => {
-    const csv = 'ردیف,تاریخ,شماره پیگیری,نوع تراکنش,مبلغ (ریال),شرح\n1,1405/08/25,111,واریز درگاه,"100",x\n1,1405/08/25,222,واریز درگاه,"200",y\n';
+    const csv =
+      'ردیف,تاریخ,شماره پیگیری,نوع تراکنش,مبلغ (ریال),شرح\n1,1405/08/25,111,واریز درگاه,"100",x\n1,1405/08/25,222,واریز درگاه,"200",y\n';
     const parsed = parseSettlementCsv(csv);
     expect(parsed.rows).toHaveLength(2);
     expect(parsed.warnings[0]).toContain('row 1 appears twice');

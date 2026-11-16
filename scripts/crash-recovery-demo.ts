@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Key property #5 live: "if the service dies at any step of a withdrawal and restarts, no withdrawal stays in an
  * unknown state and none is paid twice". Creates withdrawals, SIGKILLs every API replica while they are in flight
@@ -19,7 +18,12 @@ async function main(): Promise<void> {
   await fund(userId, String(COUNT * 200_000));
   const ids: string[] = [];
   for (let i = 0; i < COUNT; i++) {
-    const res = await api.post('/withdrawals', { userId, currency: 'IRT', amount: '200000', destination: IBAN });
+    const res = await api.post('/withdrawals', {
+      userId,
+      currency: 'IRT',
+      amount: '200000',
+      destination: IBAN,
+    });
     if (res.status === 201) ids.push(res.body.withdrawalId);
   }
   const statusesAtCrash = await Promise.all(
@@ -81,7 +85,11 @@ async function main(): Promise<void> {
     'ledger integrity': integrity.ok ? 'OK' : 'BROKEN',
   };
   console.table(report);
-  const ok = report['left non-final'] === 0 && report['requestIds paid twice'] === 0 && mismatched.length === 0 && integrity.ok;
+  const ok =
+    report['left non-final'] === 0 &&
+    report['requestIds paid twice'] === 0 &&
+    mismatched.length === 0 &&
+    integrity.ok;
   console.log(ok ? '\nRECOVERED: nothing lost, nothing paid twice' : '\nFAILED: see report');
   process.exit(ok ? 0 : 1);
 }

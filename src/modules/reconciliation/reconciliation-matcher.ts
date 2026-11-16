@@ -56,7 +56,13 @@ export function matchSettlement(
   const key = (kind: string, ref: string) => `${kind}|${normalizeReference(ref)}`;
   const ours = new Map(dayRecords.map((r) => [key(r.kind, r.reference), r]));
   const elsewhere = new Map(otherDayRecords.map((r) => [key(r.kind, r.reference), r]));
-  const result: MatchResult = { matched: 0, matchedOnOtherDay: 0, bankFeeRows: 0, bankFeesRial: 0n, mismatches: [] };
+  const result: MatchResult = {
+    matched: 0,
+    matchedOnOtherDay: 0,
+    bankFeeRows: 0,
+    bankFeesRial: 0n,
+    mismatches: [],
+  };
   const seen = new Map<string, number[]>();
 
   for (const row of rows) {

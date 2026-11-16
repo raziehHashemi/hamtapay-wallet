@@ -5,7 +5,9 @@ import { IsIn, IsString, Matches } from 'class-validator';
 import { Currency, SUPPORTED_CURRENCIES } from '../money/currency';
 import { NormalizeUserId, USER_ID_PATTERN } from '../validation/user-id';
 
-export function UserIdField(description = 'Opaque user id; the wallet is created on first use'): PropertyDecorator {
+export function UserIdField(
+  description = 'Opaque user id; the wallet is created on first use',
+): PropertyDecorator {
   return applyDecorators(
     ApiProperty({ example: 'user-42', description, pattern: USER_ID_PATTERN.source }),
     NormalizeUserId(),

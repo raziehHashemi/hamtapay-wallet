@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Live demo for the presentation: drives the running stack with the simulator in hostile mode and prints
  * an invariant report.
@@ -9,7 +8,10 @@
 import { runHostile } from '../test/e2e/support/hostile-run';
 
 async function main(): Promise<void> {
-  const report = await runHostile({ users: Number(process.env.HOSTILE_USERS ?? 20), log: (s) => console.log(`> ${s}`) });
+  const report = await runHostile({
+    users: Number(process.env.HOSTILE_USERS ?? 20),
+    log: (s) => console.log(`> ${s}`),
+  });
   const ok =
     report.providerCrossCheck.doublePayouts === 0 &&
     report.providerCrossCheck.paidButNotSucceeded.length === 0 &&

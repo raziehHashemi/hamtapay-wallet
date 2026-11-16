@@ -12,7 +12,8 @@ import { RabbitMqConnection } from './rabbitmq.connection';
     {
       provide: RabbitMqConnection,
       inject: [AppConfig],
-      useFactory: (config: AppConfig) => (config.rabbitmqUrl ? new RabbitMqConnection(config.rabbitmqUrl) : null),
+      useFactory: (config: AppConfig) =>
+        config.rabbitmqUrl ? new RabbitMqConnection(config.rabbitmqUrl) : null,
     },
     {
       provide: EventPublisher,

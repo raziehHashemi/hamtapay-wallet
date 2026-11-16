@@ -24,7 +24,11 @@ describe('ledger (real PostgreSQL)', () => {
         referenceId: userId,
         lines: [
           { account: systemAccount(Currency.IRT, AccountKind.OPS_ADJUSTMENTS), direction: 'DEBIT', amount },
-          { account: userAccount(userId, Currency.IRT, AccountKind.USER_AVAILABLE), direction: 'CREDIT', amount },
+          {
+            account: userAccount(userId, Currency.IRT, AccountKind.USER_AVAILABLE),
+            direction: 'CREDIT',
+            amount,
+          },
         ],
       }),
     );
@@ -56,14 +60,25 @@ describe('ledger (real PostgreSQL)', () => {
           referenceType: 'test',
           referenceId: user,
           lines: [
-            { account: systemAccount(Currency.IRT, AccountKind.OPS_ADJUSTMENTS), direction: 'DEBIT', amount: 5n },
-            { account: userAccount(user, Currency.IRT, AccountKind.USER_AVAILABLE), direction: 'CREDIT', amount: 5n },
+            {
+              account: systemAccount(Currency.IRT, AccountKind.OPS_ADJUSTMENTS),
+              direction: 'DEBIT',
+              amount: 5n,
+            },
+            {
+              account: userAccount(user, Currency.IRT, AccountKind.USER_AVAILABLE),
+              direction: 'CREDIT',
+              amount: 5n,
+            },
           ],
         });
         throw new Error('crash after posting, before commit');
       }),
     ).rejects.toThrow('crash');
-    const [events] = await t.dataSource.query(`SELECT count(*)::int AS n FROM outbox_events WHERE aggregate_id = $1`, [user]);
+    const [events] = await t.dataSource.query(
+      `SELECT count(*)::int AS n FROM outbox_events WHERE aggregate_id = $1`,
+      [user],
+    );
     expect(events.n).toBe(0);
     expect((await ledger.getUserBalance(t.dataSource.manager, user, Currency.IRT)).available).toBe(0n);
 
@@ -85,8 +100,16 @@ describe('ledger (real PostgreSQL)', () => {
         referenceType: 'test',
         referenceId: user,
         lines: [
-          { account: userAccount(user, Currency.IRT, AccountKind.USER_AVAILABLE), direction: 'DEBIT', amount: 101n },
-          { account: userAccount(`${user}-b`, Currency.IRT, AccountKind.USER_AVAILABLE), direction: 'CREDIT', amount: 101n },
+          {
+            account: userAccount(user, Currency.IRT, AccountKind.USER_AVAILABLE),
+            direction: 'DEBIT',
+            amount: 101n,
+          },
+          {
+            account: userAccount(`${user}-b`, Currency.IRT, AccountKind.USER_AVAILABLE),
+            direction: 'CREDIT',
+            amount: 101n,
+          },
         ],
       }),
     );
@@ -105,12 +128,12 @@ describe('ledger (real PostgreSQL)', () => {
     it('ledger entries and journals are append-only', async () => {
       const user = uniqueUser();
       await credit(user, 10n);
-      await expect(t.dataSource.query(`UPDATE ledger_entries SET amount = 1 WHERE owner_user_id = $1`, [user])).rejects.toThrow(
-        /append-only/,
-      );
-      await expect(t.dataSource.query(`DELETE FROM ledger_entries WHERE owner_user_id = $1`, [user])).rejects.toThrow(
-        /append-only/,
-      );
+      await expect(
+        t.dataSource.query(`UPDATE ledger_entries SET amount = 1 WHERE owner_user_id = $1`, [user]),
+      ).rejects.toThrow(/append-only/);
+      await expect(
+        t.dataSource.query(`DELETE FROM ledger_entries WHERE owner_user_id = $1`, [user]),
+      ).rejects.toThrow(/append-only/);
       await expect(
         t.dataSource.query(`UPDATE ledger_journals SET description = 'x' WHERE reference_id = $1`, [user]),
       ).rejects.toThrow(/append-only/);
@@ -139,9 +162,10 @@ describe('ledger (real PostgreSQL)', () => {
       const user = uniqueUser();
       await credit(user, 10n);
       await expect(
-        t.dataSource.query(`UPDATE ledger_accounts SET balance = -1 WHERE owner_user_id = $1 AND kind = 'USER_AVAILABLE'`, [
-          user,
-        ]),
+        t.dataSource.query(
+          `UPDATE ledger_accounts SET balance = -1 WHERE owner_user_id = $1 AND kind = 'USER_AVAILABLE'`,
+          [user],
+        ),
       ).rejects.toThrow(/ledger_accounts_balance_non_negative_ck/);
     });
 

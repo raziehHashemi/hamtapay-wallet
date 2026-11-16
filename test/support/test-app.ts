@@ -37,7 +37,12 @@ export interface TestApp {
  * Several instances can share one database to emulate horizontal scaling.
  */
 export async function createTestApp(
-  options: { psp?: FakePaymentGateway; payout?: FakePayoutGateway; env?: Record<string, string>; reset?: boolean } = {},
+  options: {
+    psp?: FakePaymentGateway;
+    payout?: FakePayoutGateway;
+    env?: Record<string, string>;
+    reset?: boolean;
+  } = {},
 ): Promise<TestApp> {
   Object.assign(process.env, {
     DATABASE_URL: process.env.TEST_DATABASE_URL,
@@ -120,7 +125,9 @@ export function payoutWebhook(
 
 /** Makes every scheduled row due now, then runs one worker batch (simulates time passing). */
 export async function runDispatcher(t: TestApp): Promise<void> {
-  await t.dataSource.query(`UPDATE withdrawals SET next_attempt_at = now() WHERE next_attempt_at IS NOT NULL`);
+  await t.dataSource.query(
+    `UPDATE withdrawals SET next_attempt_at = now() WHERE next_attempt_at IS NOT NULL`,
+  );
   await t.dispatcher.runOnce();
 }
 

@@ -55,36 +55,52 @@ describe('withdrawal state machine', () => {
 
   describe('from FAILED', () => {
     it('turns a later SUCCEEDED into the late-success compensation (ambiguity #1)', () => {
-      for (const reason of ['PROVIDER_FAILED:BANK_REJECTED', 'PROVIDER_REJECTED:400 INVALID_AMOUNT', 'CANCELLED_BY_USER']) {
-        expect(decideTransition(view(WithdrawalStatus.FAILED, reason), 'SUCCEEDED', null).kind).toBe('LATE_SUCCESS');
-      }
-    });
-
-    it.each<ProviderTransferStatus>(['ACCEPTED', 'PROCESSING', 'FAILED'])('ignores %s', (observed) => {
-      expect(decideTransition(view(WithdrawalStatus.FAILED, 'PROVIDER_FAILED:X'), observed, null).kind).toBe('NOOP');
-    });
-
-    it('is fully terminal once returned', () => {
-      for (const observed of ['ACCEPTED', 'PROCESSING', 'SUCCEEDED', 'FAILED', 'RETURNED'] as const) {
-        expect(decideTransition(view(WithdrawalStatus.FAILED, 'RETURNED:ACCOUNT_CLOSED'), observed, null).kind).toBe(
-          'NOOP',
+      for (const reason of [
+        'PROVIDER_FAILED:BANK_REJECTED',
+        'PROVIDER_REJECTED:400 INVALID_AMOUNT',
+        'CANCELLED_BY_USER',
+      ]) {
+        expect(decideTransition(view(WithdrawalStatus.FAILED, reason), 'SUCCEEDED', null).kind).toBe(
+          'LATE_SUCCESS',
         );
       }
     });
 
-    it('flags RETURNED for a withdrawal we had failed', () => {
-      expect(decideTransition(view(WithdrawalStatus.FAILED, 'PROVIDER_FAILED:X'), 'RETURNED', null).kind).toBe(
-        'ANOMALY',
+    it.each<ProviderTransferStatus>(['ACCEPTED', 'PROCESSING', 'FAILED'])('ignores %s', (observed) => {
+      expect(decideTransition(view(WithdrawalStatus.FAILED, 'PROVIDER_FAILED:X'), observed, null).kind).toBe(
+        'NOOP',
       );
+    });
+
+    it('is fully terminal once returned', () => {
+      for (const observed of ['ACCEPTED', 'PROCESSING', 'SUCCEEDED', 'FAILED', 'RETURNED'] as const) {
+        expect(
+          decideTransition(view(WithdrawalStatus.FAILED, 'RETURNED:ACCOUNT_CLOSED'), observed, null).kind,
+        ).toBe('NOOP');
+      }
+    });
+
+    it('flags RETURNED for a withdrawal we had failed', () => {
+      expect(
+        decideTransition(view(WithdrawalStatus.FAILED, 'PROVIDER_FAILED:X'), 'RETURNED', null).kind,
+      ).toBe('ANOMALY');
     });
   });
 
   it('every (state, observation) pair has a defined, idempotent outcome', () => {
     const statuses = Object.values(WithdrawalStatus);
-    const observations: ProviderTransferStatus[] = ['ACCEPTED', 'PROCESSING', 'SUCCEEDED', 'FAILED', 'RETURNED'];
+    const observations: ProviderTransferStatus[] = [
+      'ACCEPTED',
+      'PROCESSING',
+      'SUCCEEDED',
+      'FAILED',
+      'RETURNED',
+    ];
     for (const s of statuses) {
       for (const o of observations) {
-        expect(decideTransition(view(s, s === WithdrawalStatus.FAILED ? 'PROVIDER_FAILED:X' : null), o, 'r')).toBeDefined();
+        expect(
+          decideTransition(view(s, s === WithdrawalStatus.FAILED ? 'PROVIDER_FAILED:X' : null), o, 'r'),
+        ).toBeDefined();
       }
     }
   });

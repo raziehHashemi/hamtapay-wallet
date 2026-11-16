@@ -5,7 +5,13 @@ import { api, fund, IBAN, isFinal, newUser, sim, SimPayout, waitUntil } from './
 export interface HostileReport {
   users: number;
   deposits: { created: number; succeeded: number; failed: number; open: number };
-  withdrawals: { created: number; rejected: Record<string, number>; succeeded: number; failed: number; open: number };
+  withdrawals: {
+    created: number;
+    rejected: Record<string, number>;
+    succeeded: number;
+    failed: number;
+    open: number;
+  };
   duplicateRetries: { sent: number; extraEffects: number };
   providerCrossCheck: {
     transfers: number;
@@ -24,7 +30,10 @@ export interface HostileReport {
  * same balance, every withdrawal POST retried with the same Idempotency-Key. Then waits for everything to
  * settle and checks the invariants against our ledger AND the simulator's own record of executed transfers.
  */
-export async function runHostile(options: { users: number; log?: (s: string) => void }): Promise<HostileReport> {
+export async function runHostile(options: {
+  users: number;
+  log?: (s: string) => void;
+}): Promise<HostileReport> {
   const log = options.log ?? (() => undefined);
   const started = Date.now();
   await sim.chaos('hostile');
@@ -55,9 +64,13 @@ export async function runHostile(options: { users: number; log?: (s: string) => 
         Array.from({ length: 6 }, async () => {
           const k = randomUUID();
           const body = { userId, currency: 'IRT', amount: '400000', destination: IBAN };
-          const [r1, r2] = await Promise.all([api.post('/withdrawals', body, k), api.post('/withdrawals', body, k)]);
+          const [r1, r2] = await Promise.all([
+            api.post('/withdrawals', body, k),
+            api.post('/withdrawals', body, k),
+          ]);
           duplicateRetries++;
-          if (r1.status === 201 && r2.status === 201 && r1.body.withdrawalId !== r2.body.withdrawalId) extraEffects++;
+          if (r1.status === 201 && r2.status === 201 && r1.body.withdrawalId !== r2.body.withdrawalId)
+            extraEffects++;
           for (const r of [r1, r2]) {
             if (r.status === 201) withdrawalIds.add(r.body.withdrawalId);
           }
@@ -66,7 +79,9 @@ export async function runHostile(options: { users: number; log?: (s: string) => 
       );
     }),
   );
-  log(`created ${depositIds.length} deposits, ${withdrawalIds.size} withdrawals; waiting for final states...`);
+  log(
+    `created ${depositIds.length} deposits, ${withdrawalIds.size} withdrawals; waiting for final states...`,
+  );
 
   const finalOf = async (path: string, ids: string[]) =>
     waitUntil(
@@ -95,12 +110,20 @@ export async function runHostile(options: { users: number; log?: (s: string) => 
   const negativeWallets: string[] = [];
   for (const userId of users) {
     const wallet = (await api.get(`/wallets/${userId}`)).body;
-    if (wallet.balances.some((b: { available: string; held: string }) => b.available.startsWith('-') || b.held.startsWith('-'))) {
+    if (
+      wallet.balances.some(
+        (b: { available: string; held: string }) => b.available.startsWith('-') || b.held.startsWith('-'),
+      )
+    ) {
       negativeWallets.push(userId);
     }
   }
   const integrity = (await api.get('/internal/ledger/integrity')).body;
-  const health = await waitUntil(async () => (await api.get('/health')).body, (h) => h.outboxBacklog === 0, 30000);
+  const health = await waitUntil(
+    async () => (await api.get('/health')).body,
+    (h) => h.outboxBacklog === 0,
+    30000,
+  );
   await sim.chaos('default');
 
   return {

@@ -56,7 +56,11 @@ describe('withdrawals (real PostgreSQL, fake payout provider with the simulator 
 
     it('holds the money immediately: available drops, held rises, the same money cannot be spent twice', async () => {
       const { userId } = await fundedWithdrawal('600000', '1000000');
-      expect(await wallet(t, userId)).toMatchObject({ available: '400000', held: '600000', total: '1000000' });
+      expect(await wallet(t, userId)).toMatchObject({
+        available: '400000',
+        held: '600000',
+        total: '1000000',
+      });
       expect((await withdraw(t, userId, '500000').expect(422)).body.code).toBe('INSUFFICIENT_FUNDS');
       const transfer = await t.http
         .post('/transfers')
@@ -75,7 +79,11 @@ describe('withdrawals (real PostgreSQL, fake payout provider with the simulator 
       expect((await withdraw(t, userId, '100000').expect(422)).body.code).toBe('DAILY_LIMIT_EXCEEDED');
 
       await runDispatcher(t);
-      await payoutWebhook(t, { requestId: first.body.withdrawalId, status: 'FAILED', reason: 'BANK_REJECTED' }).expect(200);
+      await payoutWebhook(t, {
+        requestId: first.body.withdrawalId,
+        status: 'FAILED',
+        reason: 'BANK_REJECTED',
+      }).expect(200);
       await withdraw(t, userId, '150000000').expect(201); // the failed 150M no longer counts
     });
 
@@ -89,11 +97,19 @@ describe('withdrawals (real PostgreSQL, fake payout provider with the simulator 
         .expect(201);
       expect(res.body).toMatchObject({ amount: '12.5', fee: '1', status: 'PENDING' });
       expect(await wallet(t, userId, 'USDT')).toMatchObject({ available: '86.5', held: '13.5' });
-      const [usage] = await t.dataSource.query(`SELECT used_irt FROM withdrawal_daily_usage WHERE user_id = $1`, [userId]);
+      const [usage] = await t.dataSource.query(
+        `SELECT used_irt FROM withdrawal_daily_usage WHERE user_id = $1`,
+        [userId],
+      );
       expect(usage.used_irt).toBe('1250000'); // 12.5 * 100,000
 
       await runDispatcher(t);
-      expect(t.payout.submits.at(-1)).toMatchObject({ type: 'CRYPTO', currency: 'USDT', amount: '12.5', destination: VALID_TRC20 });
+      expect(t.payout.submits.at(-1)).toMatchObject({
+        type: 'CRYPTO',
+        currency: 'USDT',
+        amount: '12.5',
+        destination: VALID_TRC20,
+      });
       await payoutWebhook(t, { requestId: res.body.withdrawalId, status: 'SUCCEEDED' }).expect(200);
       expect(await wallet(t, userId, 'USDT')).toMatchObject({ available: '86.5', held: '0' });
       const [fee] = await t.dataSource.query(
@@ -135,7 +151,11 @@ describe('withdrawals (real PostgreSQL, fake payout provider with the simulator 
     it('rejects a webhook with a bad signature (401) and changes nothing', async () => {
       const { id } = await fundedWithdrawal();
       await runDispatcher(t);
-      const res = await payoutWebhook(t, { requestId: id, status: 'FAILED' }, { signature: 'ab'.repeat(32) }).expect(401);
+      const res = await payoutWebhook(
+        t,
+        { requestId: id, status: 'FAILED' },
+        { signature: 'ab'.repeat(32) },
+      ).expect(401);
       expect(res.body.code).toBe('INVALID_SIGNATURE');
       await payoutWebhook(t, { requestId: id, status: 'FAILED' }, { secret: 'wrong-secret' }).expect(401);
       expect((await get(id)).status).toBe('PROCESSING');
@@ -147,7 +167,9 @@ describe('withdrawals (real PostgreSQL, fake payout provider with the simulator 
       await payoutWebhook(t, { requestId: id, status: 'SUCCEEDED' }).expect(200);
       const stale = await payoutWebhook(t, { requestId: id, status: 'PROCESSING' }).expect(200);
       expect(stale.body.applied).toBe('NOOP');
-      await Promise.all(Array.from({ length: 5 }, () => payoutWebhook(t, { requestId: id, status: 'SUCCEEDED' })));
+      await Promise.all(
+        Array.from({ length: 5 }, () => payoutWebhook(t, { requestId: id, status: 'SUCCEEDED' })),
+      );
       expect((await get(id)).status).toBe('SUCCEEDED');
       expect((await wallet(t, userId)).available).toBe('750000');
       const [{ n }] = await t.dataSource.query(
@@ -161,7 +183,10 @@ describe('withdrawals (real PostgreSQL, fake payout provider with the simulator 
       const { userId, id } = await fundedWithdrawal();
       await runDispatcher(t);
       await payoutWebhook(t, { requestId: id, status: 'FAILED', reason: 'BANK_REJECTED' }).expect(200);
-      expect(await get(id)).toMatchObject({ status: 'FAILED', failureReason: 'PROVIDER_FAILED:BANK_REJECTED' });
+      expect(await get(id)).toMatchObject({
+        status: 'FAILED',
+        failureReason: 'PROVIDER_FAILED:BANK_REJECTED',
+      });
       expect(await wallet(t, userId)).toMatchObject({ available: '1000000', held: '0' });
     });
 
@@ -181,8 +206,15 @@ describe('withdrawals (real PostgreSQL, fake payout provider with the simulator 
       await payoutWebhook(t, { requestId: id, status: 'RETURNED', reason: 'ACCOUNT_CLOSED' }).expect(200);
       expect((await get(id)).status).toBe('FAILED');
       expect(await wallet(t, userId)).toMatchObject({ available: '1000000', held: '0' });
-      const types = await t.dataSource.query(`SELECT type FROM ledger_journals WHERE reference_id = $1 ORDER BY id`, [id]);
-      expect(types.map((r: { type: string }) => r.type)).toEqual(['WITHDRAWAL_HOLD', 'WITHDRAWAL_SETTLE', 'WITHDRAWAL_RETURN']);
+      const types = await t.dataSource.query(
+        `SELECT type FROM ledger_journals WHERE reference_id = $1 ORDER BY id`,
+        [id],
+      );
+      expect(types.map((r: { type: string }) => r.type)).toEqual([
+        'WITHDRAWAL_HOLD',
+        'WITHDRAWAL_SETTLE',
+        'WITHDRAWAL_RETURN',
+      ]);
     });
 
     it('watches successful IBAN withdrawals and catches a RETURNED by polling', async () => {
@@ -253,8 +285,17 @@ describe('withdrawals (real PostgreSQL, fake payout provider with the simulator 
 
     it('crash after the provider created the transfer but before we recorded the answer: no duplicate', async () => {
       const { id } = await fundedWithdrawal();
-      await t.dataSource.query(`UPDATE withdrawals SET status = 'PROCESSING', submitted_at = now() WHERE id = $1`, [id]);
-      await t.payout.submit({ requestId: id, type: 'IBAN', destination: VALID_IBAN, amount: '2500000', currency: 'IRR' });
+      await t.dataSource.query(
+        `UPDATE withdrawals SET status = 'PROCESSING', submitted_at = now() WHERE id = $1`,
+        [id],
+      );
+      await t.payout.submit({
+        requestId: id,
+        type: 'IBAN',
+        destination: VALID_IBAN,
+        amount: '2500000',
+        currency: 'IRR',
+      });
       await runDispatcher(t);
       await runDispatcher(t);
       expect(t.payout.creations.get(id)).toBe(1);
@@ -268,13 +309,16 @@ describe('withdrawals (real PostgreSQL, fake payout provider with the simulator 
         const res = await withdraw(review, userId, '300000').expect(201);
         review.payout.unknownForever = true;
         for (let i = 0; i < 5; i++) await runDispatcher(review);
-        const [row] = await review.dataSource.query(`SELECT status, needs_review, anomaly FROM withdrawals WHERE id = $1`, [
-          res.body.withdrawalId,
-        ]);
+        const [row] = await review.dataSource.query(
+          `SELECT status, needs_review, anomaly FROM withdrawals WHERE id = $1`,
+          [res.body.withdrawalId],
+        );
         expect(row).toMatchObject({ status: 'PROCESSING', needs_review: true });
         expect(await wallet(review, userId)).toMatchObject({ held: '300000' });
         const queue = await review.http.get('/internal/withdrawals/review').expect(200);
-        expect(queue.body.map((w: { withdrawalId: string }) => w.withdrawalId)).toContain(res.body.withdrawalId);
+        expect(queue.body.map((w: { withdrawalId: string }) => w.withdrawalId)).toContain(
+          res.body.withdrawalId,
+        );
       } finally {
         await review.close();
       }
@@ -285,10 +329,18 @@ describe('withdrawals (real PostgreSQL, fake payout provider with the simulator 
     it('is allowed while PENDING and releases funds and the cap', async () => {
       const { userId, id } = await fundedWithdrawal('400000');
       const k = key();
-      const res = await t.http.post(`/withdrawals/${id}/cancel`).set('Idempotency-Key', k).send({}).expect(200);
+      const res = await t.http
+        .post(`/withdrawals/${id}/cancel`)
+        .set('Idempotency-Key', k)
+        .send({})
+        .expect(200);
       expect(res.body).toMatchObject({ status: 'FAILED', failureReason: 'CANCELLED_BY_USER' });
       expect(await wallet(t, userId)).toMatchObject({ available: '1000000', held: '0' });
-      const replay = await t.http.post(`/withdrawals/${id}/cancel`).set('Idempotency-Key', k).send({}).expect(200);
+      const replay = await t.http
+        .post(`/withdrawals/${id}/cancel`)
+        .set('Idempotency-Key', k)
+        .send({})
+        .expect(200);
       expect(replay.headers['idempotent-replayed']).toBe('true');
       await runDispatcher(t);
       expect(t.payout.submits.some((s) => s.requestId === id)).toBe(false);
@@ -297,13 +349,21 @@ describe('withdrawals (real PostgreSQL, fake payout provider with the simulator 
     it('is refused once the withdrawal was handed to the provider', async () => {
       const { id } = await fundedWithdrawal();
       await runDispatcher(t);
-      const res = await t.http.post(`/withdrawals/${id}/cancel`).set('Idempotency-Key', key()).send({}).expect(409);
+      const res = await t.http
+        .post(`/withdrawals/${id}/cancel`)
+        .set('Idempotency-Key', key())
+        .send({})
+        .expect(409);
       expect(res.body.code).toBe('WITHDRAWAL_NOT_CANCELLABLE');
     });
 
     it('checks the owner when a userId is given', async () => {
       const { id } = await fundedWithdrawal();
-      await t.http.post(`/withdrawals/${id}/cancel`).set('Idempotency-Key', key()).send({ userId: 'someone-else' }).expect(404);
+      await t.http
+        .post(`/withdrawals/${id}/cancel`)
+        .set('Idempotency-Key', key())
+        .send({ userId: 'someone-else' })
+        .expect(404);
     });
   });
 
@@ -327,7 +387,9 @@ describe('withdrawals (real PostgreSQL, fake payout provider with the simulator 
       expect(late.body.applied).toBe('LATE_SUCCESS');
       expect((await get(first)).status).toBe('SUCCEEDED');
       expect(await wallet(t, userId)).toMatchObject({ available: '0', held: '0', debt: '800000' });
-      const [row] = await t.dataSource.query(`SELECT needs_review, anomaly FROM withdrawals WHERE id = $1`, [first]);
+      const [row] = await t.dataSource.query(`SELECT needs_review, anomaly FROM withdrawals WHERE id = $1`, [
+        first,
+      ]);
       expect(row.needs_review).toBe(true);
       expect(row.anomaly).toContain('LATE_SUCCESS_AFTER_FAILURE');
 
