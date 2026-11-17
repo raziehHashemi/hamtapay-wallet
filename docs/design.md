@@ -1,7 +1,5 @@
 # HamtaPay Wallet & Ledger Service — Design
 
-> **v2**, updated after probing the provider (`provider-notes.md`) · T-103 · Amir Saffarzadeh · change history at the end
-
 ## 1. Boundaries
 
 The service is one **NestJS modular monolith** on **PostgreSQL**, and PostgreSQL is the *only* source of truth
